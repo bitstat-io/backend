@@ -1,0 +1,47 @@
+import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+
+import { leaderboardQuerySchema, leaderboardResponseSchema } from '../schemas/leaderboard';
+import { fetchLeaderboard } from '../services/leaderboard/leaderboard';
+import { fetchPublicGame } from '../services/games/registry';
+
+export async function leaderboardRoutes(app: FastifyInstance) {
+  const gameSlugParams = z.object({
+    gameSlug: z.string().min(1).describe('Game slug'),
+  });
+
+  app.get(
+    '/games/:gameSlug/leaderboards',
+    {
+      schema: {
+        summary: 'Fetch leaderboard',
+        description:
+          'Public leaderboard for a game. `window` supports `all`, `1d`, `7d`, `30d` (`1d` is UTC day).',
+        tags: ['Leaderboards'],
+        params: gameSlugParams,
+        querystring: leaderboardQuerySchema,
+        response: {
+          200: leaderboardResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const params = request.params as { gameSlug: string };
+      const query = request.query as {
+        window: 'all' | '1d' | '7d' | '30d';
+        limit: number;
+      };
+      const scope = await fetchPublicGame(params.gameSlug);
+      if (!scope) {
+        reply.code(404);
+        return { error: { code: 'NOT_FOUND', message: 'Game not found.' } };
+      }
+      const entries = await fetchLeaderboard(scope, query.window, query.limit);
+      return {
+        gameSlug: scope.gameSlug,
+        window: query.window,
+        entries,
+      };
+    },
+  );
+}
