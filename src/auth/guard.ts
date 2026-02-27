@@ -40,7 +40,7 @@ export function requireApiKey(requiredScopes: ApiScope[] = ['ingest']) {
       return reply.send(unauthorized('Missing API key.'));
     }
 
-    const record = findApiKey(apiKey);
+    const record = await findApiKey(apiKey);
     if (!record) {
       reply.code(401);
       return reply.send(unauthorized('Invalid API key.'));

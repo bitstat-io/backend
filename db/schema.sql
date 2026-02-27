@@ -26,7 +26,7 @@ on conflict do nothing;
 
 create table if not exists core.tenants (
   id uuid primary key default gen_random_uuid(),
-  owner_user_id text,
+  owner_user_id text unique,
   name text not null,
   created_at timestamptz not null default now()
 );
@@ -46,10 +46,14 @@ create table if not exists core.api_keys (
   game_id uuid not null references core.games(id),
   env core.env_name not null,
   key_hash text not null,
+  key_prefix text not null,
+  key_ciphertext text not null,
   scopes text[] not null default array['ingest'],
   created_at timestamptz not null default now(),
   revoked_at timestamptz
 );
+
+create index if not exists idx_api_keys_hash on core.api_keys (key_hash);
 
 -- Optional scoring rules, versioned per game.
 create table if not exists core.scoring_rules (
@@ -125,3 +129,13 @@ create table if not exists analytics.leaderboard_all (
 
 -- Retention job (run daily):
 -- delete from ingest.events where client_ts < now() - interval '3 months';
+
+-- Upgrade notes (idempotent, safe to run on existing DB):
+-- 1) Ensure owner_user_id is unique (for one tenant per Supabase user).
+create unique index if not exists idx_tenants_owner_user_id on core.tenants (owner_user_id)
+where owner_user_id is not null;
+
+-- 2) Add encrypted API key storage columns if missing.
+alter table core.api_keys
+  add column if not exists key_prefix text not null default '',
+  add column if not exists key_ciphertext text not null default '';

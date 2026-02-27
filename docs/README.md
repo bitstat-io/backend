@@ -22,6 +22,7 @@ BitStat is a Fastify API that ingests game events, builds leaderboards, and expo
 - Raw events are retained for 3 months; aggregates are retained forever.
 - The API writes to Redis; a worker flushes to Supabase via Redis Streams.
 - Scoring rules can be stored per game in Supabase and applied during ingest.
+- API keys are stored in Supabase (hashed for lookup, encrypted for retrieval).
 
 ## Data Flow
 
@@ -68,6 +69,17 @@ BitStat is a Fastify API that ingests game events, builds leaderboards, and expo
 
 **Scoring rules auth**
 - Scoring rules endpoints accept either an API key (admin/read) or a Supabase JWT (owner).
+**Supabase JWT auth**
+- Use `Authorization: Bearer <access_token>` from Supabase Auth.
+- Set `SUPABASE_JWT_SECRET` (preferred) or `SUPABASE_URL` + `SUPABASE_ANON_KEY` for verification.
+
+### Supabase JWT (Owner) Only
+- `GET /v1/dashboard/games`
+- `POST /v1/dashboard/games`
+- `GET /v1/dashboard/games/:gameSlug/api-keys`
+- `POST /v1/dashboard/games/:gameSlug/api-keys`
+- `GET /v1/dashboard/games/:gameSlug/api-keys/:keyId` (explicit key retrieval)
+- `DELETE /v1/dashboard/games/:gameSlug/api-keys/:keyId`
 
 ## Event Schema
 Required fields:
@@ -114,7 +126,7 @@ The Supabase schema is stored at `db/schema.sql`.
 **Core Tables**
 - `core.tenants` (owned by `owner_user_id`)
 - `core.games`
-- `core.api_keys`
+- `core.api_keys` (hashed + encrypted)
 - `core.scoring_rules` (versioned)
 
 **Ingest**
@@ -130,7 +142,7 @@ The Supabase schema is stored at `db/schema.sql`.
 The worker consumes the Redis events stream and writes data to Supabase.
 
 **Stream**
-- Key: `stream:events`
+- Key: `stream:events:{env}`
 - Group: `REDIS_STREAM_GROUP` (default `bitstat-events`)
 - Consumer: `REDIS_STREAM_CONSUMER` (defaults to `<host>-<pid>`)
 - Batch: `REDIS_STREAM_BATCH_SIZE` (default `200`)
@@ -158,11 +170,13 @@ The worker consumes the Redis events stream and writes data to Supabase.
 | `REDIS_STREAM_BATCH_SIZE` | No | Stream batch size | `200` |
 | `REDIS_STREAM_BLOCK_MS` | No | Stream block time | `2000` |
 | `REDIS_STREAM_MAXLEN` | No | Stream max length | `200000` |
-| `SUPABASE_DB_URL` | Yes (worker, scoring rules) | Postgres connection | `postgresql://user:pass@host:5432/postgres` |
+| `SUPABASE_DB_URL` | Yes (worker, scoring rules, key mgmt) | Postgres connection | `postgresql://user:pass@host:5432/postgres` |
 | `SUPABASE_JWT_SECRET` | Optional | Verify Supabase JWT locally | `super-secret` |
 | `SUPABASE_URL` | Optional | Supabase project URL (fallback auth) | `https://xyz.supabase.co` |
 | `SUPABASE_ANON_KEY` | Optional | Supabase anon key (fallback auth) | `eyJ...` |
-| `API_KEYS_JSON` | Yes (ingest) | API key config | `[{"key":"...","tenantId":"...","gameId":"...","gameSlug":"valorant","env":"prod"}]` |
+| `API_KEYS_JSON` | Optional | Static API keys (dev/bootstrap) | `[{"key":"...","tenantId":"...","gameId":"...","gameSlug":"valorant","env":"prod"}]` |
+| `API_KEY_ENCRYPTION_SECRET` | Yes (dashboard keys) | Encrypt API keys at rest | `super-secret` |
+| `API_KEY_CACHE_TTL_MS` | No | API key lookup cache | `60000` |
 | `RATE_LIMIT_MAX` | No | Rate limit max | `200` |
 | `RATE_LIMIT_TIME_WINDOW_MS` | No | Rate window ms | `1000` |
 | `EVENT_MAX_PER_BATCH` | No | Max events/batch | `500` |
@@ -238,8 +252,8 @@ sudo systemctl enable --now bitstat-worker
 
 **Check stream lag**
 ```bash
-redis-cli XINFO GROUPS stream:events
-redis-cli XPENDING stream:events bitstat-events
+redis-cli XINFO GROUPS stream:events:prod
+redis-cli XPENDING stream:events:prod bitstat-events
 ```
 
 ## Retention Job (Raw Events = 3 months)
@@ -318,4 +332,26 @@ curl -X PUT http://localhost:3000/v1/games/valorant/scoring-rules/versions/3/act
 ```bash
 curl -X DELETE http://localhost:3000/v1/games/valorant/scoring-rules \
   -H "Authorization: Bearer <SUPABASE_JWT_OR_ADMIN_KEY>"
+```
+
+**Create a game (Supabase JWT)**
+```bash
+curl -X POST http://localhost:3000/v1/dashboard/games \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <SUPABASE_JWT>" \
+  -d '{"slug":"valorant","name":"Valorant","game_type":"fps"}'
+```
+
+**Create an API key (Supabase JWT)**
+```bash
+curl -X POST http://localhost:3000/v1/dashboard/games/valorant/api-keys \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <SUPABASE_JWT>" \
+  -d '{"env":"prod","scopes":["ingest","read"]}'
+```
+
+**Fetch an API key (explicit request)**
+```bash
+curl -H "Authorization: Bearer <SUPABASE_JWT>" \
+  http://localhost:3000/v1/dashboard/games/valorant/api-keys/<KEY_ID>
 ```

@@ -50,6 +50,17 @@ BitStat is a Redis-backed ingestion API with public leaderboards. API keys scope
 - `DELETE /v1/games/:gameSlug/scoring-rules`
 - `GET /v1/dashboard/*`
 
+**Supabase JWT (Owner)**
+- `GET /v1/dashboard/games`
+- `POST /v1/dashboard/games`
+- `GET /v1/dashboard/games/:gameSlug/api-keys`
+- `POST /v1/dashboard/games/:gameSlug/api-keys`
+- `GET /v1/dashboard/games/:gameSlug/api-keys/:keyId`
+- `DELETE /v1/dashboard/games/:gameSlug/api-keys/:keyId`
+
+Use `Authorization: Bearer <access_token>` from Supabase Auth.
+Set `SUPABASE_JWT_SECRET` (preferred) or `SUPABASE_URL` + `SUPABASE_ANON_KEY`.
+
 **Dashboard Stream**
 - SSE streams are scoped per `{tenantId, gameId, env, range}`.
 - Snapshots are cached and refreshed on a ~1s tick to avoid excessive Redis reads.
@@ -57,7 +68,8 @@ BitStat is a Redis-backed ingestion API with public leaderboards. API keys scope
 **Storage Notes**
 - All keys are namespaced: `tenant:{tenantId}:game:{gameId}:env:{env}:...`
 - Temporary unioned leaderboards and dashboard sets are stored with short TTLs.
-- Raw events are also appended to `stream:events` for the Supabase write-behind worker.
+- Raw events are appended to `stream:events:{env}` for the Supabase write-behind worker.
+- API keys are stored in Supabase with hashing + encryption (requires `API_KEY_ENCRYPTION_SECRET`).
 
 **More Docs**
 - See `docs/README.md` for the full architecture, API, and ops guide.

@@ -18,6 +18,8 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().optional(),
   SUPABASE_ANON_KEY: z.string().optional(),
   API_KEYS_JSON: z.string().optional(),
+  API_KEY_ENCRYPTION_SECRET: z.string().optional(),
+  API_KEY_CACHE_TTL_MS: z.coerce.number().int().min(1000).default(60000),
   RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(200),
   RATE_LIMIT_TIME_WINDOW_MS: z.coerce.number().int().min(100).default(1000),
   EVENT_MAX_PER_BATCH: z.coerce.number().int().min(1).max(500).default(500),

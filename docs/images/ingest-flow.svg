@@ -32,7 +32,7 @@
 
   <rect x="640" y="210" width="210" height="90" class="box-light" />
   <text x="745" y="248" class="title" text-anchor="middle">Redis Stream</text>
-  <text x="745" y="270" class="label" text-anchor="middle">XADD stream:events</text>
+  <text x="745" y="270" class="label" text-anchor="middle">XADD stream:events:{env}</text>
 
   <rect x="890" y="210" width="240" height="90" class="box" />
   <text x="1010" y="248" class="title" text-anchor="middle">Worker</text>
