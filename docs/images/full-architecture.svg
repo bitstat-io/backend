@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="700" viewBox="0 0 1400 700">
+  <defs>
+    <style>
+      .box { fill: #0f172a; stroke: #334155; stroke-width: 2; rx: 12; }
+      .box-light { fill: #0b1324; stroke: #334155; stroke-width: 2; rx: 12; }
+      .label { fill: #e2e8f0; font: 12.5px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+      .title { fill: #f8fafc; font: 16px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-weight: 600; }
+      .arrow { stroke: #94a3b8; stroke-width: 2; fill: none; }
+      .dashed { stroke-dasharray: 6 6; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
+    </marker>
+  </defs>
+
+  <rect x="40" y="40" width="260" height="120" class="box" />
+  <text x="170" y="80" class="title" text-anchor="middle">Admin Frontend</text>
+  <text x="170" y="103" class="label" text-anchor="middle">Supabase OAuth</text>
+  <text x="170" y="125" class="label" text-anchor="middle">Dashboard + Key Mgmt</text>
+
+  <rect x="40" y="210" width="260" height="120" class="box" />
+  <text x="170" y="250" class="title" text-anchor="middle">Game Client / SDK</text>
+  <text x="170" y="273" class="label" text-anchor="middle">Events + API key</text>
+  <text x="170" y="295" class="label" text-anchor="middle">Write endpoints</text>
+
+  <rect x="40" y="380" width="260" height="120" class="box" />
+  <text x="170" y="420" class="title" text-anchor="middle">Public Frontend</text>
+  <text x="170" y="443" class="label" text-anchor="middle">Leaderboards</text>
+  <text x="170" y="465" class="label" text-anchor="middle">No auth</text>
+
+  <rect x="360" y="160" width="300" height="200" class="box" />
+  <text x="510" y="205" class="title" text-anchor="middle">BitStat API</text>
+  <text x="510" y="228" class="label" text-anchor="middle">Auth: API key or JWT</text>
+  <text x="510" y="250" class="label" text-anchor="middle">Ingest + Leaderboards</text>
+  <text x="510" y="272" class="label" text-anchor="middle">Dashboard SSE + Rules</text>
+  <text x="510" y="294" class="label" text-anchor="middle">Key Mgmt Endpoints</text>
+
+  <rect x="720" y="60" width="270" height="140" class="box-light" />
+  <text x="855" y="100" class="title" text-anchor="middle">Redis</text>
+  <text x="855" y="123" class="label" text-anchor="middle">Leaderboards + Metrics</text>
+  <text x="855" y="145" class="label" text-anchor="middle">SSE cache + Streams</text>
+  <text x="855" y="167" class="label" text-anchor="middle">AOF: appendfsync everysec</text>
+
+  <rect x="720" y="240" width="270" height="140" class="box" />
+  <text x="855" y="282" class="title" text-anchor="middle">Worker</text>
+  <text x="855" y="305" class="label" text-anchor="middle">Redis Streams consumer</text>
+  <text x="855" y="327" class="label" text-anchor="middle">Write-behind to Supabase</text>
+
+  <rect x="1040" y="60" width="300" height="140" class="box-light" />
+  <text x="1190" y="100" class="title" text-anchor="middle">Supabase</text>
+  <text x="1190" y="123" class="label" text-anchor="middle">Events + Aggregates</text>
+  <text x="1190" y="145" class="label" text-anchor="middle">Scoring rules</text>
+  <text x="1190" y="167" class="label" text-anchor="middle">API keys (hashed + encrypted)</text>
+
+  <rect x="1040" y="240" width="300" height="140" class="box-light" />
+  <text x="1190" y="282" class="title" text-anchor="middle">Retention Job</text>
+  <text x="1190" y="305" class="label" text-anchor="middle">Delete raw events</text>
+  <text x="1190" y="327" class="label" text-anchor="middle">3 month policy</text>
+
+  <rect x="360" y="430" width="300" height="120" class="box-light" />
+  <text x="510" y="470" class="title" text-anchor="middle">Supabase Auth</text>
+  <text x="510" y="493" class="label" text-anchor="middle">Google OAuth</text>
+  <text x="510" y="515" class="label" text-anchor="middle">JWT for owner endpoints</text>
+
+  <path d="M 300 100 L 360 200" class="arrow" marker-end="url(#arrow)" />
+  <path d="M 300 270 L 360 240" class="arrow" marker-end="url(#arrow)" />
+  <path d="M 300 440 L 360 260" class="arrow" marker-end="url(#arrow)" />
+
+  <path d="M 660 240 L 720 130" class="arrow" marker-end="url(#arrow)" />
+  <path d="M 660 260 L 720 300" class="arrow" marker-end="url(#arrow)" />
+  <path d="M 990 130 L 1040 130" class="arrow" marker-end="url(#arrow)" />
+  <path d="M 990 300 L 1040 300" class="arrow" marker-end="url(#arrow)" />
+
+  <path d="M 510 430 L 510 360" class="arrow dashed" marker-end="url(#arrow)" />
+  <path d="M 510 550 L 510 500" class="arrow dashed" marker-end="url(#arrow)" />
+</svg>
