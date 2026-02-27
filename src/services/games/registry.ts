@@ -3,36 +3,39 @@ import type { Pipeline } from 'ioredis';
 
 import { redis } from '../../redis/client';
 import { key } from '../../redis/keys';
-import type { GameScope } from '../../auth/types';
+import type { EnvName, GameScope } from '../../auth/types';
 
 const scopeSchema = z.object({
   tenantId: z.string().min(1),
   gameId: z.string().min(1),
   gameSlug: z.string().min(1),
-  env: z.enum(['dev', 'staging', 'prod']),
+  env: z.enum(['dev', 'prod']),
 });
+
+const PUBLIC_ENVS: EnvName[] = ['dev', 'prod'];
 
 function normalizeSlug(slug: string) {
   return slug.toLowerCase();
 }
 
 export async function registerPublicGame(scope: GameScope, pipeline?: Pipeline) {
-  if (scope.env !== 'prod') return;
+  if (!PUBLIC_ENVS.includes(scope.env)) return;
   const payload = JSON.stringify({
     tenantId: scope.tenantId,
     gameId: scope.gameId,
     gameSlug: scope.gameSlug,
     env: scope.env,
   });
+  const publicKey = key.publicGames(scope.env);
   if (pipeline) {
-    pipeline.hsetnx(key.publicGames(), normalizeSlug(scope.gameSlug), payload);
+    pipeline.hsetnx(publicKey, normalizeSlug(scope.gameSlug), payload);
     return;
   }
-  await redis.hsetnx(key.publicGames(), normalizeSlug(scope.gameSlug), payload);
+  await redis.hsetnx(publicKey, normalizeSlug(scope.gameSlug), payload);
 }
 
-export async function fetchPublicGame(gameSlug: string): Promise<GameScope | null> {
-  const raw = await redis.hget(key.publicGames(), normalizeSlug(gameSlug));
+export async function fetchPublicGame(gameSlug: string, env: EnvName): Promise<GameScope | null> {
+  const raw = await redis.hget(key.publicGames(env), normalizeSlug(gameSlug));
   if (!raw) return null;
   try {
     const parsed = scopeSchema.parse(JSON.parse(raw));
@@ -47,7 +50,7 @@ export async function fetchPublicGame(gameSlug: string): Promise<GameScope | nul
   }
 }
 
-export async function listPublicGames(): Promise<string[]> {
-  const slugs = await redis.hkeys(key.publicGames());
+export async function listPublicGames(env: EnvName): Promise<string[]> {
+  const slugs = await redis.hkeys(key.publicGames(env));
   return slugs.map(normalizeSlug).sort();
 }

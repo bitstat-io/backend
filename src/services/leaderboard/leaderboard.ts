@@ -1,7 +1,7 @@
 import { env } from '../../config/env';
 import { redis } from '../../redis/client';
 import { key } from '../../redis/keys';
-import { dayIdsForWindow } from '../../utils/time';
+import { dayId, dayIdsForWindow, epochMinute } from '../../utils/time';
 import type { LeaderboardWindow } from '../../schemas/leaderboard';
 import type { GameScope } from '../../auth/types';
 
@@ -36,7 +36,8 @@ async function resolveLeaderboardKey(scope: GameScope, window: LeaderboardWindow
 
   const days = window === '1d' ? 1 : window === '7d' ? 7 : 30;
   const dayKeys = dayIdsForWindow(days).map((day) => key.leaderboardDay(scope, day));
-  const tempKey = key.tempWindow(scope, window);
+  const bucket = String(epochMinute(new Date()));
+  const tempKey = key.tempWindow(scope, window, bucket);
 
   await redis.zunionstore(tempKey, dayKeys.length, ...dayKeys);
   await redis.expire(tempKey, env.LEADERBOARD_TEMP_TTL_SEC);

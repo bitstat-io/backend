@@ -5,8 +5,8 @@ import { gamesRoutes } from './games';
 import { dashboardRoutes } from './dashboard';
 import { healthRoutes } from './health';
 import { leaderboardRoutes } from './leaderboard';
-import { simulateRoutes } from './simulate';
 import { statsRoutes } from './stats';
+import { scoringRoutes } from './scoring';
 
 export async function registerRoutes(app: FastifyInstance) {
   await app.register(
@@ -17,7 +17,7 @@ export async function registerRoutes(app: FastifyInstance) {
       await v1.register(eventsRoutes);
       await v1.register(leaderboardRoutes);
       await v1.register(statsRoutes);
-      await v1.register(simulateRoutes);
+      await v1.register(scoringRoutes);
     },
     { prefix: '/v1' },
   );

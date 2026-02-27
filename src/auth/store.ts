@@ -4,7 +4,7 @@ import { env } from '../config/env';
 import type { ApiKeyRecord, ApiScope, GameScope } from './types';
 
 const scopeSchema = z.enum(['ingest', 'read', 'admin']);
-const envSchema = z.enum(['dev', 'staging', 'prod']);
+const envSchema = z.enum(['dev', 'prod']);
 
 const apiKeySchema = z.object({
   key: z.string().min(1),

@@ -7,6 +7,7 @@ import type { GameScope } from '../../auth/types';
 import { eventSchema, type Event } from '../../schemas/events';
 import { dayId, toDateFromClientTs, MS_PER_DAY } from '../../utils/time';
 import { scoreEvent } from './scoring';
+import { getScoringRule } from './rules';
 import { recordErrors, recordEventTelemetry, recordRejections, recordRejectedLog } from '../metrics/telemetry';
 import { registerPublicGame } from '../games/registry';
 
@@ -67,6 +68,11 @@ export async function ingestEvents(scope: GameScope, rawEvents: unknown[]): Prom
     }
 
     const event = parsed.data;
+    if (!validatePropertiesSize(event.event_properties)) {
+      rejected += 1;
+      rejectedLogs.push(buildRejectLog(scope, 'event_properties_too_large', raw, event));
+      continue;
+    }
     const eventDate = toDateFromClientTs(event.client_ts);
     if (!eventDate) {
       rejected += 1;
@@ -125,16 +131,41 @@ export async function ingestEvents(scope: GameScope, rawEvents: unknown[]): Prom
 
   if (errors === 0 && acceptedEvents.length > 0) {
     const transaction = redis.multi();
+    const scoringRule = await getScoringRule(scope.gameId);
     await registerPublicGame(scope, transaction);
     accepted = acceptedEvents.length;
 
     for (const candidate of acceptedEvents) {
       const { event, eventDate } = candidate;
-      const score = scoreEvent(event);
+      const score = scoreEvent(event, scoringRule);
       const day = dayId(eventDate);
+      const streamPayload = JSON.stringify(event);
 
       transaction.zincrby(key.leaderboardAll(scope), score, event.user_id);
       transaction.zincrby(key.leaderboardDay(scope, day), score, event.user_id);
+      transaction.xadd(
+        key.eventsStream(scope.env),
+        'MAXLEN',
+        '~',
+        env.REDIS_STREAM_MAXLEN,
+        '*',
+        'tenant_id',
+        scope.tenantId,
+        'game_id',
+        scope.gameId,
+        'game_slug',
+        scope.gameSlug,
+        'env',
+        scope.env,
+        'event',
+        streamPayload,
+        'score',
+        String(score),
+        'dedup_id',
+        candidate.dedupId,
+        'day',
+        day,
+      );
 
       updateStats(transaction, scope, event);
       recordEventTelemetry(transaction, scope, event, eventDate);
@@ -168,6 +199,15 @@ export async function ingestEvents(scope: GameScope, rawEvents: unknown[]): Prom
   }
 
   return errors > 0 ? { accepted, rejected, errors } : { accepted, rejected };
+}
+
+function validatePropertiesSize(properties: Record<string, unknown>) {
+  try {
+    const size = Buffer.byteLength(JSON.stringify(properties ?? {}), 'utf8');
+    return size <= env.EVENT_PROPERTIES_MAX_BYTES;
+  } catch {
+    return false;
+  }
 }
 
 function buildRejectLog(scope: GameScope, reason: string, raw?: unknown, event?: Event) {
@@ -208,19 +248,31 @@ function updateStats(pipeline: Pipeline, scope: GameScope, event: Event) {
 
   pipeline.hincrby(statsKey, 'events', 1);
   if (event.game_type === 'fps') {
-    pipeline.hincrby(statsKey, 'kills', event.event_properties.kills);
-    pipeline.hincrby(statsKey, 'deaths', event.event_properties.deaths);
-    pipeline.hincrby(statsKey, 'assists', event.event_properties.assists);
+    pipeline.hincrby(statsKey, 'kills', toInt(event.event_properties, 'kills'));
+    pipeline.hincrby(statsKey, 'deaths', toInt(event.event_properties, 'deaths'));
+    pipeline.hincrby(statsKey, 'assists', toInt(event.event_properties, 'assists'));
     if (event.event_id === 'match_complete') {
       pipeline.hincrby(statsKey, 'matches', 1);
     }
     return;
   }
 
-  pipeline.hincrby(statsKey, 'coins', event.event_properties.coins);
-  pipeline.hincrby(statsKey, 'level', event.event_properties.level);
-  pipeline.hincrbyfloat(statsKey, 'iap_amount', event.event_properties.iap_amount);
-  if (event.event_id === 'session_start') {
-    pipeline.hincrby(statsKey, 'sessions', 1);
+  if (event.game_type === 'mobile') {
+    pipeline.hincrby(statsKey, 'coins', toInt(event.event_properties, 'coins'));
+    pipeline.hincrby(statsKey, 'level', toInt(event.event_properties, 'level'));
+    pipeline.hincrbyfloat(statsKey, 'iap_amount', toNumber(event.event_properties, 'iap_amount'));
+    if (event.event_id === 'session_start') {
+      pipeline.hincrby(statsKey, 'sessions', 1);
+    }
   }
+}
+
+function toInt(record: Record<string, unknown>, key: string) {
+  const value = record?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : 0;
+}
+
+function toNumber(record: Record<string, unknown>, key: string) {
+  const value = record?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }

@@ -1,52 +1,27 @@
 import { z } from 'zod';
 
-const gaCategorySchema = z.enum([
-  'user',
-  'session_end',
-  'business',
-  'progression',
-  'resource',
-  'design',
-  'error',
-  'ad',
-  'impression',
-]);
+const categorySchema = z
+  .string()
+  .min(2)
+  .max(50)
+  .regex(/^[a-z0-9_-]{2,50}$/, 'category must match ^[a-z0-9_-]{2,50}$');
+
+const gameTypeSchema = z.string().min(1).max(50);
 
 const baseEvent = z.object({
   user_id: z.string().min(1),
   session_id: z.string().min(1),
   client_ts: z.coerce.number().int().min(1),
   v: z.coerce.number().int().min(1).optional(),
-  category: gaCategorySchema,
+  category: categorySchema,
   event_id: z.string().min(1),
+  game_type: gameTypeSchema.optional().default('other'),
   platform: z.enum(['pc', 'console', 'mobile']).optional(),
   region: z.enum(['na', 'eu', 'apac', 'latam']).optional(),
+  event_properties: z.record(z.unknown()),
 });
 
-const fpsMetricsSchema = z.object({
-  kills: z.number().int().min(0).max(200),
-  deaths: z.number().int().min(0).max(200),
-  assists: z.number().int().min(0).max(200),
-});
-
-const mobileMetricsSchema = z.object({
-  iap_amount: z.number().min(0).max(500),
-  level: z.number().int().min(0).max(500),
-  coins: z.number().int().min(0).max(1_000_000),
-});
-
-export const fpsEventSchema = baseEvent.extend({
-  game_type: z.literal('fps'),
-  match_id: z.string().min(1).optional(),
-  event_properties: fpsMetricsSchema,
-});
-
-export const mobileEventSchema = baseEvent.extend({
-  game_type: z.literal('mobile'),
-  event_properties: mobileMetricsSchema,
-});
-
-export const eventSchema = z.discriminatedUnion('game_type', [fpsEventSchema, mobileEventSchema]);
+export const eventSchema = baseEvent;
 
 export const batchSchema = z.object({
   events: z.array(z.unknown()),
@@ -58,7 +33,5 @@ export const ingestResponseSchema = z.object({
   errors: z.number().int().nonnegative().optional(),
 });
 
-export type FpsEvent = z.infer<typeof fpsEventSchema>;
-export type MobileEvent = z.infer<typeof mobileEventSchema>;
 export type Event = z.infer<typeof eventSchema>;
 export type BatchPayload = z.infer<typeof batchSchema>;

@@ -1,6 +1,6 @@
 export type ApiScope = 'ingest' | 'read' | 'admin';
 
-export type EnvName = 'dev' | 'staging' | 'prod';
+export type EnvName = 'dev' | 'prod';
 
 export type GameScope = {
   tenantId: string;

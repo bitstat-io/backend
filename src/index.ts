@@ -37,7 +37,8 @@ async function buildServer() {
           'BitStat MVP API for game analytics ingestion and public leaderboards.\n\n' +
           'Quick start:\n' +
           '1. Ingest events with `POST /v1/events/batch` using your API key.\n' +
-          '2. Fetch public leaderboards with `GET /v1/games/{gameSlug}/leaderboards`.\n\n' +
+          '2. Fetch public leaderboards with `GET /v1/games/{gameSlug}/leaderboards` (prod)\n' +
+          '   or `GET /v1/games/dev/{gameSlug}/leaderboards` (dev).\n\n' +
           'Authentication:\n' +
           '- Provide `X-API-Key: <key>` (or `Authorization: Bearer <key>`) for protected endpoints.',
       },
@@ -46,8 +47,8 @@ async function buildServer() {
         { name: 'Leaderboards', description: 'Public leaderboard endpoints' },
         { name: 'Games', description: 'Public game discovery endpoints' },
         { name: 'Stats', description: 'Per-player stats endpoints' },
+        { name: 'Scoring', description: 'Per-game scoring rules' },
         { name: 'Dashboard', description: 'Admin dashboard endpoints' },
-        { name: 'Simulate', description: 'Admin simulation helpers' },
         { name: 'Health', description: 'Service health checks' },
       ],
       components: {
@@ -78,7 +79,6 @@ async function buildServer() {
             category: 'design',
             event_id: 'match_complete',
             game_type: 'fps',
-            match_id: 'match-42',
             platform: 'pc',
             region: 'na',
             event_properties: {
@@ -131,6 +131,15 @@ async function buildServer() {
       });
 
       setResponseExample('/v1/games/{gameSlug}/leaderboards', 'get', '200', {
+        gameSlug: 'tetris',
+        window: '1d',
+        entries: [
+          { rank: 1, user_id: 'player_123', score: 230 },
+          { rank: 2, user_id: 'player_991', score: 210 },
+        ],
+      });
+
+      setResponseExample('/v1/games/dev/{gameSlug}/leaderboards', 'get', '200', {
         gameSlug: 'tetris',
         window: '1d',
         entries: [

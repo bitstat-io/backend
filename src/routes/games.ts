@@ -18,7 +18,7 @@ export async function gamesRoutes(app: FastifyInstance) {
       },
     },
     async () => {
-      const games = (await listPublicGames()).map((slug) => ({ game_slug: slug }));
+      const games = (await listPublicGames('prod')).map((slug) => ({ game_slug: slug }));
       return { games };
     },
   );

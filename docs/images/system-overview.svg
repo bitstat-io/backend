@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560">
+  <defs>
+    <style>
+      .box { fill: #0f172a; stroke: #334155; stroke-width: 2; rx: 10; }
+      .box-light { fill: #0b1324; stroke: #334155; stroke-width: 2; rx: 10; }
+      .label { fill: #e2e8f0; font: 12.5px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+      .title { fill: #f8fafc; font: 15px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-weight: 600; }
+      .arrow { stroke: #94a3b8; stroke-width: 2; fill: none; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
+    </marker>
+  </defs>
+
+  <rect x="40" y="30" width="250" height="110" class="box" />
+  <text x="165" y="65" class="title" text-anchor="middle">Admin Frontend</text>
+  <text x="165" y="88" class="label" text-anchor="middle">Dashboard + Rules</text>
+  <text x="165" y="110" class="label" text-anchor="middle">Supabase JWT</text>
+
+  <rect x="40" y="185" width="250" height="110" class="box" />
+  <text x="165" y="220" class="title" text-anchor="middle">Game Client / SDK</text>
+  <text x="165" y="243" class="label" text-anchor="middle">Events + API key</text>
+  <text x="165" y="265" class="label" text-anchor="middle">Write endpoints</text>
+
+  <rect x="40" y="340" width="250" height="110" class="box" />
+  <text x="165" y="375" class="title" text-anchor="middle">Frontend</text>
+  <text x="165" y="398" class="label" text-anchor="middle">Public leaderboards</text>
+  <text x="165" y="420" class="label" text-anchor="middle">No auth</text>
+
+  <rect x="340" y="150" width="270" height="150" class="box" />
+  <text x="475" y="190" class="title" text-anchor="middle">BitStat API</text>
+  <text x="475" y="213" class="label" text-anchor="middle">Auth: API key or JWT</text>
+  <text x="475" y="235" class="label" text-anchor="middle">Dashboard SSE + Rules</text>
+  <text x="475" y="257" class="label" text-anchor="middle">Ingest + Leaderboards</text>
+
+  <rect x="680" y="40" width="240" height="130" class="box-light" />
+  <text x="800" y="82" class="title" text-anchor="middle">Redis</text>
+  <text x="800" y="105" class="label" text-anchor="middle">Leaderboards + Metrics</text>
+  <text x="800" y="127" class="label" text-anchor="middle">SSE cache + Streams</text>
+  <text x="800" y="149" class="label" text-anchor="middle">AOF: appendfsync everysec</text>
+
+  <rect x="680" y="215" width="240" height="130" class="box" />
+  <text x="800" y="255" class="title" text-anchor="middle">Worker</text>
+  <text x="800" y="278" class="label" text-anchor="middle">Redis Streams consumer</text>
+  <text x="800" y="300" class="label" text-anchor="middle">Batch write-behind</text>
+
+  <rect x="980" y="40" width="190" height="130" class="box-light" />
+  <text x="1075" y="82" class="title" text-anchor="middle">Supabase</text>
+  <text x="1075" y="105" class="label" text-anchor="middle">Events + Aggregates</text>
+  <text x="1075" y="127" class="label" text-anchor="middle">Scoring rules</text>
+  <text x="1075" y="149" class="label" text-anchor="middle">Auth (JWT)</text>
+
+  <rect x="980" y="215" width="190" height="130" class="box-light" />
+  <text x="1075" y="255" class="title" text-anchor="middle">Retention Job</text>
+  <text x="1075" y="278" class="label" text-anchor="middle">Delete raw events</text>
+  <text x="1075" y="300" class="label" text-anchor="middle">3 month policy</text>
+
+  <path d="M 290 85 L 340 195" class="arrow" marker-end="url(#arrow)" />
+  <path d="M 290 240 L 340 225" class="arrow" marker-end="url(#arrow)" />
+  <path d="M 290 395 L 340 255" class="arrow" marker-end="url(#arrow)" />
+  <path d="M 610 205 L 680 105" class="arrow" marker-end="url(#arrow)" />
+  <path d="M 610 245 L 680 280" class="arrow" marker-end="url(#arrow)" />
+  <path d="M 920 105 L 980 105" class="arrow" marker-end="url(#arrow)" />
+  <path d="M 920 280 L 980 280" class="arrow" marker-end="url(#arrow)" />
+</svg>

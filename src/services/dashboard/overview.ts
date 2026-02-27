@@ -1,8 +1,6 @@
 import { redis } from '../../redis/client';
 import { key } from '../../redis/keys';
-import { FUNNEL_STEPS } from '../metrics/telemetry';
 import { dayId, MS_PER_DAY, MS_PER_HOUR, MS_PER_MINUTE, MS_PER_SECOND } from '../../utils/time';
-import { getStreamState } from '../simulate/stream';
 import type { GameScope } from '../../auth/types';
 
 type Range = '5m' | '1h' | '24h' | '7d';
@@ -77,13 +75,10 @@ export async function getDashboardOverview(range: Range, scope: GameScope) {
   const eventsPerSec = latestEvents / config.unitSeconds;
 
   const uniquePlayers = await getUniquePlayers(scope, range);
-  const funnel = await getFunnel(scope, range);
   const topGames = await getTopGames(scope, range, 5);
   const topPlayers = await getTopPlayers(scope, range, 5);
   const recentEvents = await getRecentEvents(scope, 12);
   const recentRejected = await getRecentRejected(scope, 8);
-  const stream = getStreamState();
-
   return {
     range,
     updatedAt: new Date().toISOString(),
@@ -100,24 +95,9 @@ export async function getDashboardOverview(range: Range, scope: GameScope) {
       iap: totals.iap,
       eventsPerSec,
     },
-    stream: {
-      simulationId: stream.id,
-      status: stream.status,
-      mode: stream.mode,
-      rate: stream.rate,
-      batchSize: stream.batchSize,
-      sent: stream.sent,
-      accepted: stream.accepted,
-      rejected: stream.rejected,
-      errors: stream.errors,
-      startedAt: stream.startedAt,
-      updatedAt: stream.updatedAt,
-      error: stream.error,
-    },
     recentEvents,
     recentRejected,
     traffic,
-    funnel,
     topGames,
     topPlayers,
   };
@@ -169,38 +149,6 @@ async function getUniquePlayers(scope: GameScope, range: Range) {
   return Number(result) || 0;
 }
 
-async function getFunnel(scope: GameScope, range: Range) {
-  const config = AGG_RANGE_CONFIG[range];
-  const buckets = buildBuckets({ unit: config.unit, points: config.points, stepMs: config.stepMs });
-  const keys = buckets.map((bucket) => funnelKey(scope, config.unit, bucket.id));
-  if (keys.length === 0) {
-    return FUNNEL_STEPS.map((step) => ({ step, count: 0, rate: 0 }));
-  }
-
-  const pipeline = redis.pipeline();
-  keys.forEach((funnel) => pipeline.hmget(funnel, ...FUNNEL_STEPS));
-  const results = await pipeline.exec();
-
-  const totals = FUNNEL_STEPS.reduce<Record<string, number>>((acc, step) => {
-    acc[step] = 0;
-    return acc;
-  }, {});
-
-  results?.forEach((entry) => {
-    const values = entry?.[1] as Array<string | null> | undefined;
-    if (!values) return;
-    values.forEach((value, index) => {
-      totals[FUNNEL_STEPS[index]] += Number(value ?? 0);
-    });
-  });
-
-  const firstCount = totals[FUNNEL_STEPS[0]] || 0;
-  return FUNNEL_STEPS.map((step) => ({
-    step,
-    count: totals[step] || 0,
-    rate: firstCount > 0 ? (totals[step] || 0) / firstCount : 0,
-  }));
-}
 
 async function getTopGames(scope: GameScope, range: Range, limit: number) {
   const config = AGG_RANGE_CONFIG[range];
@@ -250,12 +198,6 @@ async function getTopPlayers(scope: GameScope, range: Range, limit: number) {
   await redis.expire(temp, 15);
   const list = await redis.zrevrange(temp, 0, limit - 1, 'WITHSCORES');
   return toTopPlayers(list);
-}
-
-function funnelKey(scope: GameScope, unit: BucketUnit, id: string | number) {
-  if (unit === 'min') return key.funnelMinute(scope, id as number);
-  if (unit === 'hour') return key.funnelHour(scope, id as number);
-  return key.funnelDay(scope, id as string);
 }
 
 function gameEventsKey(scope: GameScope, unit: BucketUnit, id: string | number) {
@@ -309,7 +251,7 @@ async function getRecentEvents(scope: GameScope, limit: number) {
           game_slug: string;
           event_id: string;
           user_id: string;
-          game_type: 'fps' | 'mobile';
+          game_type: string;
           platform: string | null;
           region: string | null;
         };
