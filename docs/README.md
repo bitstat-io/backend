@@ -81,6 +81,262 @@ BitStat is a Fastify API that ingests game events, builds leaderboards, and expo
 - `GET /v1/dashboard/games/:gameSlug/api-keys/:keyId` (explicit key retrieval)
 - `DELETE /v1/dashboard/games/:gameSlug/api-keys/:keyId`
 
+## API Data Formats
+
+**Auth headers**
+- API key: `X-API-Key: <key>` or `Authorization: Bearer <key>`
+- Supabase JWT: `Authorization: Bearer <access_token>`
+
+**Common error shape**
+```json
+{ "error": { "code": "UNAUTHORIZED", "message": "..." } }
+```
+
+### `GET /v1/health`
+```json
+{ "status": "ok", "redis": true }
+```
+
+### `GET /v1/games`
+```json
+{ "games": [{ "game_slug": "valorant" }] }
+```
+
+### `GET /v1/games/:gameSlug/leaderboards`
+Query: `window=all|1d|7d|30d`, `limit=1..100`
+```json
+{
+  "gameSlug": "valorant",
+  "window": "1d",
+  "entries": [{ "rank": 1, "user_id": "player_1", "score": 120 }]
+}
+```
+
+### `GET /v1/games/dev/:gameSlug/leaderboards`
+Query: `window=all|1d|7d|30d`, `limit=1..100`
+```json
+{
+  "gameSlug": "valorant",
+  "window": "1d",
+  "entries": [{ "rank": 1, "user_id": "player_1", "score": 120 }]
+}
+```
+
+### `POST /v1/events/batch`
+Request body
+```json
+{
+  "events": [
+    {
+      "user_id": "player_1",
+      "session_id": "s1",
+      "client_ts": 1761246154,
+      "v": 1,
+      "category": "combat",
+      "event_id": "match_complete",
+      "game_type": "fps",
+      "platform": "pc",
+      "region": "na",
+      "event_properties": { "kills": 5, "deaths": 2, "assists": 1 }
+    }
+  ]
+}
+```
+Response
+```json
+{ "accepted": 10, "rejected": 2, "errors": 0 }
+```
+
+### `GET /v1/games/:gameSlug/stats`
+Query: `user_id=<player id>`
+```json
+{
+  "gameSlug": "valorant",
+  "user_id": "player_1",
+  "stats": { "events": "12", "kills": "5" }
+}
+```
+
+### `GET /v1/games/:gameSlug/scoring-rules`
+```json
+{
+  "gameSlug": "valorant",
+  "version": 3,
+  "rules": {
+    "weights": {
+      "default": { "score": 1 },
+      "category": { "combat": { "kills": 2 } },
+      "event": { "monster_kill": { "kills": 3 } }
+    }
+  },
+  "active": true
+}
+```
+
+### `POST /v1/games/:gameSlug/scoring-rules`
+Request body
+```json
+{
+  "weights": {
+    "default": { "score": 1 },
+    "category": { "combat": { "kills": 2 } },
+    "event": { "monster_kill": { "kills": 3 } }
+  }
+}
+```
+Response: same as `GET /v1/games/:gameSlug/scoring-rules`
+
+### `PUT /v1/games/:gameSlug/scoring-rules`
+Request body: same as `POST /v1/games/:gameSlug/scoring-rules`
+Response: same as `GET /v1/games/:gameSlug/scoring-rules`
+
+### `GET /v1/games/:gameSlug/scoring-rules/versions`
+```json
+{
+  "gameSlug": "valorant",
+  "versions": [
+    { "version": 3, "active": true, "created_at": "2026-02-28T08:00:00.000Z" }
+  ]
+}
+```
+
+### `PUT /v1/games/:gameSlug/scoring-rules/versions/:version/activate`
+Response: same as `GET /v1/games/:gameSlug/scoring-rules`
+
+### `DELETE /v1/games/:gameSlug/scoring-rules`
+```json
+{ "gameSlug": "valorant", "active": false }
+```
+
+### `GET /v1/dashboard/overview`
+Query: `range=5m|1h|24h|7d`
+```json
+{
+  "range": "5m",
+  "updatedAt": "2026-02-28T08:00:00.000Z",
+  "summary": {
+    "events": 120,
+    "accepted": 118,
+    "rejected": 2,
+    "errors": 0,
+    "uniquePlayers": 45,
+    "errorRate": 0,
+    "rejectRate": 0.016,
+    "fpsEvents": 80,
+    "mobileEvents": 38,
+    "iap": 12.5,
+    "eventsPerSec": 0.4
+  },
+  "recentEvents": [
+    {
+      "ts": "2026-02-28T08:00:00.000Z",
+      "game_id": "uuid",
+      "game_slug": "valorant",
+      "event_id": "match_complete",
+      "user_id": "player_1",
+      "game_type": "fps",
+      "platform": "pc",
+      "region": "na"
+    }
+  ],
+  "recentRejected": [
+    {
+      "ts": "2026-02-28T08:00:00.000Z",
+      "reason": "invalid_schema",
+      "event_id": "match_complete",
+      "game_id": "uuid",
+      "user_id": "player_1",
+      "game_slug": "valorant",
+      "tenant_id": "uuid",
+      "category": "combat",
+      "client_ts": 1761246154
+    }
+  ],
+  "traffic": [
+    {
+      "ts": "2026-02-28T08:00:00.000Z",
+      "events": 2,
+      "accepted": 2,
+      "rejected": 0,
+      "errors": 0,
+      "fps": 2,
+      "mobile": 0,
+      "iap": 0
+    }
+  ],
+  "topGames": [{ "game_id": "uuid", "events": 20, "iap": 4.5 }],
+  "topPlayers": [{ "user_id": "player_1", "score": 120 }]
+}
+```
+
+### `GET /v1/dashboard/stream`
+Query: `range=5m|1h|24h|7d`
+SSE payload (each `data:` line) uses the same JSON shape as `GET /v1/dashboard/overview`.
+
+### `GET /v1/dashboard/games`
+```json
+{
+  "games": [
+    {
+      "id": "uuid",
+      "slug": "valorant",
+      "name": "Valorant",
+      "game_type": "fps",
+      "created_at": "2026-02-28T08:00:00.000Z"
+    }
+  ]
+}
+```
+
+### `POST /v1/dashboard/games`
+Request body
+```json
+{ "slug": "valorant", "name": "Valorant", "game_type": "fps" }
+```
+Response: same as `GET /v1/dashboard/games` entry.
+
+### `GET /v1/dashboard/games/:gameSlug/api-keys`
+```json
+{
+  "keys": [
+    {
+      "id": "uuid",
+      "env": "prod",
+      "scopes": ["ingest", "read"],
+      "key_prefix": "bs_",
+      "created_at": "2026-02-28T08:00:00.000Z",
+      "revoked_at": null
+    }
+  ]
+}
+```
+
+### `POST /v1/dashboard/games/:gameSlug/api-keys`
+Request body
+```json
+{ "env": "prod", "scopes": ["ingest", "read"] }
+```
+Response (includes `key` on create)
+```json
+{
+  "id": "uuid",
+  "env": "prod",
+  "scopes": ["ingest", "read"],
+  "key_prefix": "bs_",
+  "key": "bs_live_...",
+  "created_at": "2026-02-28T08:00:00.000Z",
+  "revoked_at": null
+}
+```
+
+### `GET /v1/dashboard/games/:gameSlug/api-keys/:keyId`
+Response: same shape as `POST /v1/dashboard/games/:gameSlug/api-keys`
+
+### `DELETE /v1/dashboard/games/:gameSlug/api-keys/:keyId`
+```json
+{ "id": "uuid", "revoked_at": "2026-02-28T08:00:00.000Z" }
+```
+
 ## Event Schema
 Required fields:
 - `user_id`, `session_id`, `client_ts`, `category`, `event_id`, `event_properties`
