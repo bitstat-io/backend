@@ -48,6 +48,10 @@ async function requireSupabaseUser(request: FastifyRequest, reply: FastifyReply)
     reply.code(401);
     return reply.send({ error: { code: 'UNAUTHORIZED', message: 'Invalid Supabase JWT.' } });
   }
+  if (!user.email) {
+    reply.code(400);
+    return reply.send({ error: { code: 'BAD_REQUEST', message: 'Owner email is required in the auth token.' } });
+  }
   return user as SupabaseUser;
 }
 
@@ -84,11 +88,11 @@ export async function ownerRoutes(app: FastifyInstance) {
            g.published_prod_at,
            g.published_dev_at,
            g.created_at
-         from public.games g
-         join public.tenants t on g.tenant_id = t.id
-         where t.owner_user_id = $1
+         from public.core_games g
+         join public.core_tenants t on g.tenant_id = t.id
+         where t.email = $1
          order by g.created_at desc`,
-        [user.id],
+        [user.email],
       );
 
       const games = result.rows.map((row) => mapGame(row));
@@ -124,23 +128,23 @@ export async function ownerRoutes(app: FastifyInstance) {
       const gameType = body.game_type?.trim() || null;
       const coverImageUrl = body.cover_image_url?.trim() || null;
 
-      const existing = await db.query(`select 1 from public.games where slug = $1 limit 1`, [slug]);
+      const existing = await db.query(`select 1 from public.core_games where slug = $1 limit 1`, [slug]);
       if (existing.rows.length > 0) {
         reply.code(409);
         return reply.send({ error: { code: 'CONFLICT', message: 'Game slug already exists.' } });
       }
 
       const tenantResult = await db.query(
-        `insert into public.tenants (owner_user_id, name)
-         values ($1, $2)
-         on conflict (owner_user_id) do update set name = public.tenants.name
+        `insert into public.core_tenants (email)
+         values ($1)
+         on conflict (email) do update set email = excluded.email
          returning id`,
-        [user.id, user.email ? `${user.email}` : `tenant-${user.id.slice(0, 8)}`],
+        [user.email],
       );
       const tenantId = String(tenantResult.rows[0].id);
 
       const gameResult = await db.query(
-        `insert into public.games (tenant_id, slug, name, game_type, cover_image_url)
+        `insert into public.core_games (tenant_id, slug, name, game_type, cover_image_url)
          values ($1, $2, $3, $4, $5)
          returning
            id,
@@ -183,7 +187,7 @@ export async function ownerRoutes(app: FastifyInstance) {
       }
 
       const params = request.params as { gameSlug: string };
-      const owned = await findOwnedGameBySlug(params.gameSlug, user.id);
+      const owned = await findOwnedGameBySlug(params.gameSlug, user.email!);
       if (!owned) {
         reply.code(404);
         return reply.send({ error: { code: 'NOT_FOUND', message: 'Game not found.' } });
@@ -208,7 +212,7 @@ export async function ownerRoutes(app: FastifyInstance) {
 
       values.push(owned.gameId);
       const result = await db.query(
-        `update public.games
+        `update public.core_games
          set ${updates.join(', ')}
          where id = $${values.length}
          returning
@@ -253,7 +257,7 @@ export async function ownerRoutes(app: FastifyInstance) {
       }
 
       const params = request.params as { gameSlug: string };
-      const owned = await findOwnedGameBySlug(params.gameSlug, user.id);
+      const owned = await findOwnedGameBySlug(params.gameSlug, user.email!);
       if (!owned) {
         reply.code(404);
         return reply.send({ error: { code: 'NOT_FOUND', message: 'Game not found.' } });
@@ -268,7 +272,7 @@ export async function ownerRoutes(app: FastifyInstance) {
       const publishedAtColumn = body.env === 'prod' ? 'published_prod_at' : 'published_dev_at';
 
       const result = await db.query(
-        `update public.games
+        `update public.core_games
          set ${isPublishedColumn} = true,
              ${publishedAtColumn} = coalesce(${publishedAtColumn}, now())
          where id = $1
@@ -314,7 +318,7 @@ export async function ownerRoutes(app: FastifyInstance) {
       }
 
       const params = request.params as { gameSlug: string };
-      const owned = await findOwnedGameBySlug(params.gameSlug, user.id);
+      const owned = await findOwnedGameBySlug(params.gameSlug, user.email!);
       if (!owned) {
         reply.code(404);
         return reply.send({ error: { code: 'NOT_FOUND', message: 'Game not found.' } });
@@ -324,7 +328,7 @@ export async function ownerRoutes(app: FastifyInstance) {
       const isPublishedColumn = body.env === 'prod' ? 'is_published_prod' : 'is_published_dev';
 
       const result = await db.query(
-        `update public.games
+        `update public.core_games
          set ${isPublishedColumn} = false
          where id = $1
          returning
@@ -368,7 +372,7 @@ export async function ownerRoutes(app: FastifyInstance) {
       }
 
       const params = request.params as { gameSlug: string };
-      const owned = await findOwnedGameBySlug(params.gameSlug, user.id);
+      const owned = await findOwnedGameBySlug(params.gameSlug, user.email!);
       if (!owned) {
         reply.code(404);
         return reply.send({ error: { code: 'NOT_FOUND', message: 'Game not found.' } });
@@ -420,7 +424,7 @@ export async function ownerRoutes(app: FastifyInstance) {
       }
 
       const params = request.params as { gameSlug: string };
-      const owned = await findOwnedGameBySlug(params.gameSlug, user.id);
+      const owned = await findOwnedGameBySlug(params.gameSlug, user.email!);
       if (!owned) {
         reply.code(404);
         return reply.send({ error: { code: 'NOT_FOUND', message: 'Game not found.' } });
@@ -478,7 +482,7 @@ export async function ownerRoutes(app: FastifyInstance) {
       }
 
       const params = request.params as { gameSlug: string; keyId: string };
-      const owned = await findOwnedGameBySlug(params.gameSlug, user.id);
+      const owned = await findOwnedGameBySlug(params.gameSlug, user.email!);
       if (!owned) {
         reply.code(404);
         return reply.send({ error: { code: 'NOT_FOUND', message: 'Game not found.' } });

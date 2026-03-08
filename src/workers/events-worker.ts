@@ -210,7 +210,7 @@ async function writeBatch(records: StreamRecord[]) {
     await client.query('BEGIN');
 
     const eventInsert = buildInsertQuery(
-      'public.events',
+      'public.ingest_events',
       [
         'tenant_id',
         'game_id',
@@ -238,10 +238,10 @@ async function writeBatch(records: StreamRecord[]) {
     const { leaderboardAllRows, leaderboardDailyRows } = buildLeaderboardRows(insertedRows);
 
     const allInsert = buildInsertQuery(
-      'public.leaderboard_all',
+      'public.analytics_leaderboard_all',
       ['game_id', 'env', 'user_id', 'score'],
       leaderboardAllRows,
-      'ON CONFLICT (game_id, env, user_id) DO UPDATE SET score = public.leaderboard_all.score + EXCLUDED.score',
+      'ON CONFLICT (game_id, env, user_id) DO UPDATE SET score = public.analytics_leaderboard_all.score + EXCLUDED.score',
     );
 
     if (allInsert) {
@@ -249,10 +249,10 @@ async function writeBatch(records: StreamRecord[]) {
     }
 
     const dailyInsert = buildInsertQuery(
-      'public.leaderboard_daily',
+      'public.analytics_leaderboard_daily',
       ['game_id', 'env', 'day', 'user_id', 'score'],
       leaderboardDailyRows,
-      'ON CONFLICT (game_id, env, day, user_id) DO UPDATE SET score = public.leaderboard_daily.score + EXCLUDED.score',
+      'ON CONFLICT (game_id, env, day, user_id) DO UPDATE SET score = public.analytics_leaderboard_daily.score + EXCLUDED.score',
     );
 
     if (dailyInsert) {

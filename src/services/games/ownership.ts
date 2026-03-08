@@ -14,7 +14,7 @@ export type OwnedGame = {
   createdAt: string;
 };
 
-export async function findOwnedGameBySlug(gameSlug: string, ownerUserId: string): Promise<OwnedGame | null> {
+export async function findOwnedGameBySlug(gameSlug: string, ownerEmail: string): Promise<OwnedGame | null> {
   const db = getDb();
   if (!db) return null;
 
@@ -31,11 +31,11 @@ export async function findOwnedGameBySlug(gameSlug: string, ownerUserId: string)
        g.published_dev_at,
        g.created_at,
        t.id as tenant_id
-     from public.games g
-     join public.tenants t on g.tenant_id = t.id
-     where g.slug = $1 and t.owner_user_id = $2
+     from public.core_games g
+     join public.core_tenants t on g.tenant_id = t.id
+     where g.slug = $1 and t.email = $2
      limit 1`,
-    [gameSlug, ownerUserId],
+    [gameSlug, ownerEmail],
   );
 
   const row = result.rows[0];

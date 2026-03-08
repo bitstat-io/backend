@@ -19,7 +19,7 @@ BitStat is a Redis-backed ingestion API with public leaderboards. API keys scope
 - Scores are derived from `scoreEvent` in `src/services/ingest/scoring.ts` using per-game rules.
 - If no rule exists, `event_properties.score` is used when present; otherwise the event contributes `0`.
 - By default scoring is game-type agnostic. To change scoring, edit `src/services/ingest/scoring.ts` and redeploy.
-- Per-game scoring rules are read from `public.scoring_rules` (Supabase) when `SUPABASE_DB_URL` is set.
+- Per-game scoring rules are read from `public.core_scoring_rules` (Supabase) when `SUPABASE_DB_URL` is set.
 
 **Stats**
 - `events` increments for every accepted event.

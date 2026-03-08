@@ -36,7 +36,7 @@ export async function getScoringRule(gameId: string): Promise<ScoringRule | null
 
   try {
     const result = await db.query(
-      'select version, rules from public.scoring_rules where game_id = $1 and is_active = true order by version desc limit 1',
+      'select version, rules from public.core_scoring_rules where game_id = $1 and is_active = true order by version desc limit 1',
       [gameId],
     );
 

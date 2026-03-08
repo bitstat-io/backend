@@ -20,16 +20,15 @@ begin
 end
 $$;
 
-create table if not exists public.tenants (
+create table if not exists public.core_tenants (
   id uuid primary key default gen_random_uuid(),
-  owner_user_id text unique,
-  name text not null,
+  email text not null,
   created_at timestamptz not null default now()
 );
 
-create table if not exists public.games (
+create table if not exists public.core_games (
   id uuid primary key default gen_random_uuid(),
-  tenant_id uuid not null references public.tenants(id),
+  tenant_id uuid not null references public.core_tenants(id),
   slug text not null unique,
   name text not null,
   game_type text,
@@ -41,10 +40,10 @@ create table if not exists public.games (
   created_at timestamptz not null default now()
 );
 
-create table if not exists public.api_keys (
+create table if not exists public.core_api_keys (
   id uuid primary key default gen_random_uuid(),
-  tenant_id uuid not null references public.tenants(id),
-  game_id uuid not null references public.games(id),
+  tenant_id uuid not null references public.core_tenants(id),
+  game_id uuid not null references public.core_games(id),
   env public.env_name not null,
   key_hash text not null,
   key_prefix text not null,
@@ -53,12 +52,12 @@ create table if not exists public.api_keys (
   revoked_at timestamptz
 );
 
-create index if not exists idx_api_keys_hash on public.api_keys (key_hash);
+create index if not exists idx_core_api_keys_hash on public.core_api_keys (key_hash);
 
 -- Optional scoring rules, versioned per game.
-create table if not exists public.scoring_rules (
+create table if not exists public.core_scoring_rules (
   id uuid primary key default gen_random_uuid(),
-  game_id uuid not null references public.games(id),
+  game_id uuid not null references public.core_games(id),
   version int not null,
   rules jsonb not null,
   is_active boolean not null default true,
@@ -67,10 +66,10 @@ create table if not exists public.scoring_rules (
 );
 
 -- Raw events (append-only)
-create table if not exists public.events (
+create table if not exists public.ingest_events (
   id bigserial primary key,
-  tenant_id uuid not null references public.tenants(id),
-  game_id uuid not null references public.games(id),
+  tenant_id uuid not null references public.core_tenants(id),
+  game_id uuid not null references public.core_games(id),
   env public.env_name not null,
   user_id text not null,
   session_id text not null,
@@ -84,14 +83,14 @@ create table if not exists public.events (
   unique (game_id, env, dedup_id)
 );
 
-create index if not exists idx_events_game_time on public.events (game_id, env, client_ts desc);
-create index if not exists idx_events_user_time on public.events (game_id, env, user_id, client_ts desc);
-create index if not exists idx_events_event_id on public.events (game_id, env, event_id);
+create index if not exists idx_ingest_events_game_time on public.ingest_events (game_id, env, client_ts desc);
+create index if not exists idx_ingest_events_user_time on public.ingest_events (game_id, env, user_id, client_ts desc);
+create index if not exists idx_ingest_events_event_id on public.ingest_events (game_id, env, event_id);
 
 -- Custom metrics per game
-create table if not exists public.metric_definitions (
+create table if not exists public.analytics_metric_definitions (
   id uuid primary key default gen_random_uuid(),
-  game_id uuid not null references public.games(id),
+  game_id uuid not null references public.core_games(id),
   metric_key text not null,
   data_type text not null,    -- 'int', 'float', 'bool'
   agg_type text not null,     -- 'sum', 'count', 'max', 'last'
@@ -99,8 +98,8 @@ create table if not exists public.metric_definitions (
   unique (game_id, metric_key)
 );
 
-create table if not exists public.user_metrics (
-  game_id uuid not null references public.games(id),
+create table if not exists public.analytics_user_metrics (
+  game_id uuid not null references public.core_games(id),
   env public.env_name not null,
   user_id text not null,
   metric_key text not null,
@@ -110,8 +109,8 @@ create table if not exists public.user_metrics (
 );
 
 -- Leaderboards
-create table if not exists public.leaderboard_daily (
-  game_id uuid not null references public.games(id),
+create table if not exists public.analytics_leaderboard_daily (
+  game_id uuid not null references public.core_games(id),
   env public.env_name not null,
   day date not null,
   user_id text not null,
@@ -119,8 +118,8 @@ create table if not exists public.leaderboard_daily (
   primary key (game_id, env, day, user_id)
 );
 
-create table if not exists public.leaderboard_all (
-  game_id uuid not null references public.games(id),
+create table if not exists public.analytics_leaderboard_all (
+  game_id uuid not null references public.core_games(id),
   env public.env_name not null,
   user_id text not null,
   score numeric not null default 0,
@@ -128,7 +127,6 @@ create table if not exists public.leaderboard_all (
 );
 
 -- Retention job (run daily):
--- delete from public.events where client_ts < now() - interval '3 months';
+-- delete from public.ingest_events where client_ts < now() - interval '3 months';
 
-create unique index if not exists idx_tenants_owner_user_id on public.tenants (owner_user_id)
-where owner_user_id is not null;
+create unique index if not exists idx_core_tenants_email on public.core_tenants (email);

@@ -70,7 +70,7 @@ async function fetchLeaderboardFromDb(
   if (window === 'all') {
     const result = await db.query(
       `select user_id, score
-       from public.leaderboard_all
+       from public.analytics_leaderboard_all
        where game_id = $1 and env = $2
        order by score desc, user_id asc
        limit $3`,
@@ -87,7 +87,7 @@ async function fetchLeaderboardFromDb(
   const days = dayIdsForWindow(window === '1d' ? 1 : window === '7d' ? 7 : 30).map(toDayDate);
   const result = await db.query(
     `select user_id, sum(score) as score
-     from public.leaderboard_daily
+     from public.analytics_leaderboard_daily
      where game_id = $1
        and env = $2
        and day = any($3::date[])

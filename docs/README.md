@@ -46,7 +46,7 @@ This diagram is the fastest way to understand the MVP architecture end to end: w
 - Public leaderboard reads prefer Redis for speed and fall back to Postgres leaderboard aggregates when leaderboard cache data is missing.
 - Public game discovery uses a Redis-backed registry keyed by publish state, with Postgres used to rebuild missing registry entries.
 - Owner flows are explicit backend actions: create game, update metadata, create API key, publish, and unpublish.
-- Scoring is applied during ingest using per-game rules from `public.scoring_rules` when available, with a simple event-property fallback for MVP usage.
+- Scoring is applied during ingest using per-game rules from `public.core_scoring_rules` when available, with a simple event-property fallback for MVP usage.
 - Stats are generic and event-driven. The backend increments common counters like `matches` and `sessions`, and aggregates numeric properties such as `kills`, `coins`, and `iap_amount`.
 
 ## Architecture Notes
@@ -387,7 +387,7 @@ Rules:
 
 ## Scoring Rules
 Scores are computed during ingest and written to Redis + the stream.
-- Per-game scoring rules (from `public.scoring_rules`) are applied first.
+- Per-game scoring rules (from `public.core_scoring_rules`) are applied first.
 - If no rule is found, `event_properties.score` is used when present; otherwise `0`.
 - Rule order: `event_id` → `category` → `default`.
 - JWT verification is local when `SUPABASE_JWT_SECRET` is set; otherwise it falls back to `SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY`.
@@ -416,19 +416,19 @@ The Supabase schema is stored at `db/schema.sql`.
 - `env` is `dev` or `prod` on all event and aggregate rows.
 
 **Core Tables**
-- `public.tenants` (owned by `owner_user_id`)
-- `public.games`
-- `public.api_keys` (hashed)
-- `public.scoring_rules` (versioned)
+- `public.core_tenants` (owned by `email`)
+- `public.core_games`
+- `public.core_api_keys` (hashed)
+- `public.core_scoring_rules` (versioned)
 
 **Ingest**
-- `public.events` (append-only). Use `dedup_id` + unique constraint to make writes idempotent.
+- `public.ingest_events` (append-only). Use `dedup_id` + unique constraint to make writes idempotent.
 
 **Analytics**
-- `public.metric_definitions`
-- `public.user_metrics`
-- `public.leaderboard_daily`
-- `public.leaderboard_all`
+- `public.analytics_metric_definitions`
+- `public.analytics_user_metrics`
+- `public.analytics_leaderboard_daily`
+- `public.analytics_leaderboard_all`
 
 ## Worker
 The worker consumes the Redis events stream and writes data to Supabase.
@@ -442,8 +442,8 @@ The worker consumes the Redis events stream and writes data to Supabase.
 - Max length: `REDIS_STREAM_MAXLEN` (default `200000`)
 
 **Responsibilities**
-- Insert raw events into `public.events` (idempotent via `dedup_id`).
-- Increment `public.leaderboard_all` and `public.leaderboard_daily`.
+- Insert raw events into `public.ingest_events` (idempotent via `dedup_id`).
+- Increment `public.analytics_leaderboard_all` and `public.analytics_leaderboard_daily`.
 
 **Run**
 - `npm run worker`
@@ -552,13 +552,13 @@ Create a daily cron job that deletes old raw events.
 
 **SQL**
 ```sql
-DELETE FROM public.events
+DELETE FROM public.ingest_events
 WHERE client_ts < now() - interval '3 months';
 ```
 
 **Cron example**
 ```
-0 3 * * * psql "$SUPABASE_DB_URL" -c "DELETE FROM public.events WHERE client_ts < now() - interval '3 months';"
+0 3 * * * psql "$SUPABASE_DB_URL" -c "DELETE FROM public.ingest_events WHERE client_ts < now() - interval '3 months';"
 ```
 
 ## API Examples

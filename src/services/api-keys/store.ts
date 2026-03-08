@@ -18,8 +18,8 @@ export async function findApiKeyRecord(rawKey: string): Promise<ApiKeyRecord | n
   const hash = hashApiKey(rawKey);
   const result = await db.query(
     `select k.tenant_id, k.game_id, k.env, k.scopes, g.slug as game_slug
-     from public.api_keys k
-     join public.games g on g.id = k.game_id
+     from public.core_api_keys k
+     join public.core_games g on g.id = k.game_id
      where k.key_hash = $1 and k.revoked_at is null
      limit 1`,
     [hash],
@@ -47,7 +47,7 @@ export async function listApiKeys(gameId: string): Promise<ApiKeyRow[]> {
 
   const result = await db.query(
     `select id, env, scopes, key_prefix, created_at, revoked_at
-     from public.api_keys
+     from public.core_api_keys
      where game_id = $1
      order by created_at desc`,
     [gameId],
@@ -77,7 +77,7 @@ export async function createApiKey(params: {
   const prefix = keyPrefix(rawKey);
 
   const result = await db.query(
-    `insert into public.api_keys (tenant_id, game_id, env, key_hash, key_prefix, scopes)
+    `insert into public.core_api_keys (tenant_id, game_id, env, key_hash, key_prefix, scopes)
      values ($1, $2, $3, $4, $5, $6)
      returning id, env, scopes, key_prefix, created_at, revoked_at`,
     [params.tenantId, params.gameId, params.env, hash, prefix, params.scopes],
@@ -100,7 +100,7 @@ export async function revokeApiKey(gameId: string, keyId: string) {
   if (!db) throw new Error('DB_UNAVAILABLE');
 
   const result = await db.query(
-    `update public.api_keys
+    `update public.core_api_keys
      set revoked_at = now()
      where id = $1 and game_id = $2 and revoked_at is null
      returning id, revoked_at`,

@@ -44,7 +44,7 @@ export async function syncPublicGameCache(gameId: string, pipeline?: RedisChain)
        g.cover_image_url,
        g.is_published_prod,
        g.is_published_dev
-     from public.games g
+     from public.core_games g
      where g.id = $1
      limit 1`,
     [gameId],
@@ -107,7 +107,7 @@ export async function fetchPublicGame(gameSlug: string, env: EnvName): Promise<P
        g.name,
        g.game_type,
        g.cover_image_url
-     from public.games g
+     from public.core_games g
      where g.slug = $1
        and g.${publishColumn} = true
      limit 1`,
@@ -158,7 +158,7 @@ export async function listPublicGames(env: EnvName): Promise<PublicGame[]> {
        g.name,
        g.game_type,
        g.cover_image_url
-     from public.games g
+     from public.core_games g
      where g.${publishColumn} = true
      order by g.slug asc`,
   );
