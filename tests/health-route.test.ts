@@ -48,7 +48,8 @@ describe('health routes', () => {
           group: 'bitstat-events',
           pending: 12,
           consumers: 0,
-          reason: 'no_registered_consumers',
+          heartbeat: 'fresh',
+          reason: 'pending_threshold_exceeded',
         },
       },
     });
@@ -69,7 +70,8 @@ describe('health routes', () => {
           group: 'bitstat-events',
           pending: 12,
           consumers: 0,
-          reason: 'no_registered_consumers',
+          heartbeat: 'fresh',
+          reason: 'pending_threshold_exceeded',
         },
       },
     });

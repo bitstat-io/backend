@@ -7,6 +7,7 @@ describe('getReadinessStatus', () => {
     const status = await getReadinessStatus({
       redisClient: {
         ping: async () => 'PONG',
+        get: async () => '{"consumer":"worker-1"}',
         xpending: async () => [0, null, null, []],
         xinfo: async () => [['name', 'consumer-1', 'pending', 0, 'idle', 100]],
       },
@@ -29,18 +30,18 @@ describe('getReadinessStatus', () => {
           group: 'bitstat-events',
           pending: 0,
           consumers: 1,
+          heartbeat: 'fresh',
         },
       },
     });
   });
 
-  it('fails readiness when the worker consumer group is missing', async () => {
+  it('fails readiness when the worker heartbeat is missing', async () => {
     const status = await getReadinessStatus({
       redisClient: {
         ping: async () => 'PONG',
-        xpending: async () => {
-          throw new Error('NOGROUP No such key');
-        },
+        get: async () => null,
+        xpending: async () => [0, null, null, []],
         xinfo: async () => [],
       },
       db: {
@@ -57,7 +58,33 @@ describe('getReadinessStatus', () => {
       group: 'bitstat-events',
       pending: null,
       consumers: null,
-      reason: 'consumer_group_missing',
+      heartbeat: 'missing',
+      reason: 'worker_heartbeat_missing',
+    });
+  });
+
+  it('reports ok for an idle worker when heartbeat is fresh', async () => {
+    const status = await getReadinessStatus({
+      redisClient: {
+        ping: async () => 'PONG',
+        get: async () => '{"consumer":"worker-1"}',
+        xpending: async () => [0, null, null, []],
+        xinfo: async () => [],
+      },
+      db: {
+        query: async () => ({ rows: [{ '?column?': 1 }] }),
+      },
+      streamKey: 'stream:prod',
+      streamGroup: 'bitstat-events',
+    });
+
+    expect(status.checks.worker).toEqual({
+      status: 'ok',
+      stream: 'stream:prod',
+      group: 'bitstat-events',
+      pending: 0,
+      consumers: 0,
+      heartbeat: 'fresh',
     });
   });
 });

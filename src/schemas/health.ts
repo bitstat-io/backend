@@ -14,6 +14,7 @@ const workerCheckSchema = dependencyCheckSchema.extend({
   group: z.string().min(1),
   pending: z.number().int().nonnegative().nullable(),
   consumers: z.number().int().nonnegative().nullable(),
+  heartbeat: z.enum(['fresh', 'missing', 'unknown']),
 });
 
 export const healthResponseSchema = z.object({

@@ -23,6 +23,7 @@ const envSchema = z.object({
   RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(200),
   RATE_LIMIT_TIME_WINDOW_MS: z.coerce.number().int().min(100).default(1000),
   READINESS_MAX_STREAM_PENDING: z.coerce.number().int().min(0).default(1000),
+  READINESS_WORKER_HEARTBEAT_TTL_SEC: z.coerce.number().int().min(5).default(30),
   EVENT_MAX_PER_BATCH: z.coerce.number().int().min(1).max(500).default(500),
   EVENT_FUTURE_MAX_DAYS: z.coerce.number().int().min(0).default(30),
   EVENT_PAST_MAX_DAYS: z.coerce.number().int().min(1).default(365),

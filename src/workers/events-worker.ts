@@ -12,6 +12,9 @@ import { scoreEvent } from '../services/ingest/scoring';
 const STREAM_KEY = key.eventsStream(env.REDIS_STREAM_ENV);
 const GROUP = env.REDIS_STREAM_GROUP;
 const CONSUMER = env.REDIS_STREAM_CONSUMER ?? `${os.hostname()}-${process.pid}`;
+const HEARTBEAT_KEY = key.workerHeartbeat(env.REDIS_STREAM_ENV, GROUP);
+const HEARTBEAT_TTL_SEC = env.READINESS_WORKER_HEARTBEAT_TTL_SEC;
+const HEARTBEAT_INTERVAL_MS = Math.max(1000, Math.floor((HEARTBEAT_TTL_SEC * 1000) / 3));
 const CLAIM_START_ID = '0-0';
 
 const pool = env.SUPABASE_DB_URL ? new Pool({ connectionString: env.SUPABASE_DB_URL, max: 2 }) : null;
@@ -55,6 +58,14 @@ async function ensureGroup() {
     const message = error instanceof Error ? error.message : String(error);
     if (!message.includes('BUSYGROUP')) throw error;
   }
+}
+
+async function publishHeartbeat() {
+  await redis.set(HEARTBEAT_KEY, JSON.stringify({
+    consumer: CONSUMER,
+    stream: STREAM_KEY,
+    ts: new Date().toISOString(),
+  }), 'EX', HEARTBEAT_TTL_SEC);
 }
 
 function toFieldMap(fields: string[]): Record<string, string> {
@@ -323,6 +334,14 @@ async function run() {
   }
 
   await ensureGroup();
+  await publishHeartbeat();
+  const heartbeatTimer = setInterval(() => {
+    void publishHeartbeat().catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error('Worker heartbeat failed:', error);
+    });
+  }, HEARTBEAT_INTERVAL_MS);
+  heartbeatTimer.unref();
 
   // eslint-disable-next-line no-console
   console.log(`Worker connected. stream=${STREAM_KEY} group=${GROUP} consumer=${CONSUMER}`);

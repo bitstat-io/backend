@@ -14,6 +14,7 @@ function prefix(scope: GameScope) {
 export const key = {
   publicGames: (env: EnvName) => root(`public:games:${env}`),
   eventsStream: (env: EnvName) => root(`stream:events:${env}`),
+  workerHeartbeat: (env: EnvName, group: string) => root(`worker:heartbeat:${env}:${group}`),
   leaderboardAll: (scope: GameScope) => `${prefix(scope)}:lb:all`,
   leaderboardDay: (scope: GameScope, day: string) => `${prefix(scope)}:lb:day:${day}`,
   stats: (scope: GameScope, userId: string) => `${prefix(scope)}:stats:${userId}`,

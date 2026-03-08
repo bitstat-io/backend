@@ -85,8 +85,9 @@ Set `SUPABASE_JWT_SECRET` (preferred) or `SUPABASE_URL` + `SUPABASE_PUBLISHABLE_
 
 **Operational Readiness**
 - `GET /v1/health` is a liveness probe.
-- `GET /v1/health/ready` returns `503` when Redis, Postgres, or the worker consumer group is not ready.
+- `GET /v1/health/ready` returns `503` when Redis, Postgres, or the worker heartbeat is not ready.
 - `READINESS_MAX_STREAM_PENDING` controls how many pending worker messages are tolerated before readiness fails.
+- `READINESS_WORKER_HEARTBEAT_TTL_SEC` controls how long a worker heartbeat can go stale before readiness fails.
 
 **More Docs**
 - See `docs/README.md` for the full architecture, API, and ops guide.

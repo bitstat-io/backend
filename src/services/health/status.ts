@@ -15,6 +15,7 @@ type WorkerCheck = BasicCheck & {
   group: string;
   pending: number | null;
   consumers: number | null;
+  heartbeat: 'fresh' | 'missing' | 'unknown';
 };
 
 export type HealthStatus = {
@@ -36,6 +37,7 @@ export type ReadinessStatus = {
 type HealthDeps = {
   redisClient?: {
     ping: () => Promise<string>;
+    get: (keyName: string) => Promise<string | null>;
     xpending: (keyName: string, group: string) => Promise<unknown>;
     xinfo: (subcommand: 'CONSUMERS', keyName: string, group: string) => Promise<unknown>;
   };
@@ -44,6 +46,7 @@ type HealthDeps = {
   } | null;
   streamKey?: string;
   streamGroup?: string;
+  heartbeatKey?: string;
   maxPending?: number;
 };
 
@@ -64,6 +67,7 @@ export async function getReadinessStatus(deps: HealthDeps = {}): Promise<Readine
   const db = deps.db === undefined ? getDb() : deps.db;
   const streamKey = deps.streamKey ?? key.eventsStream(env.REDIS_STREAM_ENV);
   const streamGroup = deps.streamGroup ?? env.REDIS_STREAM_GROUP;
+  const heartbeatKey = deps.heartbeatKey ?? key.workerHeartbeat(env.REDIS_STREAM_ENV, streamGroup);
   const maxPending = deps.maxPending ?? 1000;
 
   const redisCheck = await pingRedis(redisClient);
@@ -74,6 +78,7 @@ export async function getReadinessStatus(deps: HealthDeps = {}): Promise<Readine
     dbCheck,
     streamKey,
     streamGroup,
+    heartbeatKey,
     maxPending,
   });
 
@@ -130,6 +135,7 @@ async function checkWorker(params: {
   dbCheck: BasicCheck;
   streamKey: string;
   streamGroup: string;
+  heartbeatKey: string;
   maxPending: number;
 }): Promise<WorkerCheck> {
   const base: WorkerCheck = {
@@ -138,6 +144,7 @@ async function checkWorker(params: {
     group: params.streamGroup,
     pending: null,
     consumers: null,
+    heartbeat: 'unknown',
   };
 
   if (params.redisCheck.status !== 'ok') {
@@ -149,18 +156,19 @@ async function checkWorker(params: {
   }
 
   try {
+    const heartbeat = await params.redisClient.get(params.heartbeatKey);
+    if (!heartbeat) {
+      return { ...base, heartbeat: 'missing', reason: 'worker_heartbeat_missing' };
+    }
+
     const pendingSummary = await params.redisClient.xpending(params.streamKey, params.streamGroup);
     const consumersInfo = await params.redisClient.xinfo('CONSUMERS', params.streamKey, params.streamGroup);
 
     const pending = parsePendingCount(pendingSummary);
     const consumers = parseConsumerCount(consumersInfo);
 
-    if (consumers < 1) {
-      return { ...base, pending, consumers, reason: 'no_registered_consumers' };
-    }
-
     if (pending > params.maxPending) {
-      return { ...base, pending, consumers, reason: 'pending_threshold_exceeded' };
+      return { ...base, pending, consumers, heartbeat: 'fresh', reason: 'pending_threshold_exceeded' };
     }
 
     return {
@@ -169,6 +177,7 @@ async function checkWorker(params: {
       group: params.streamGroup,
       pending,
       consumers,
+      heartbeat: 'fresh',
     };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);

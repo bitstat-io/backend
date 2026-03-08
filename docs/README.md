@@ -437,6 +437,7 @@ The worker consumes the Redis events stream and writes data to Supabase.
 - Key: `stream:events:{env}`
 - Group: `REDIS_STREAM_GROUP` (default `bitstat-events`)
 - Consumer: `REDIS_STREAM_CONSUMER` (defaults to `<host>-<pid>`)
+- Heartbeat: `worker:heartbeat:{env}:{group}`
 - Batch: `REDIS_STREAM_BATCH_SIZE` (default `200`)
 - Block: `REDIS_STREAM_BLOCK_MS` (default `2000`)
 - Max length: `REDIS_STREAM_MAXLEN` (default `200000`)
@@ -470,6 +471,8 @@ The worker consumes the Redis events stream and writes data to Supabase.
 | `API_KEY_CACHE_TTL_MS` | No | API key lookup cache | `60000` |
 | `RATE_LIMIT_MAX` | No | Rate limit max | `200` |
 | `RATE_LIMIT_TIME_WINDOW_MS` | No | Rate window ms | `1000` |
+| `READINESS_MAX_STREAM_PENDING` | No | Pending stream threshold | `1000` |
+| `READINESS_WORKER_HEARTBEAT_TTL_SEC` | No | Worker heartbeat freshness window | `30` |
 | `EVENT_MAX_PER_BATCH` | No | Max events/batch | `500` |
 | `EVENT_FUTURE_MAX_DAYS` | No | Future timestamp allowance | `30` |
 | `EVENT_PAST_MAX_DAYS` | No | Past timestamp allowance | `365` |
