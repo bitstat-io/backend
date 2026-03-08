@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="840" viewBox="0 0 1400 840">
+  <defs>
+    <style>
+      .bg { fill: #08111f; }
+      .lane { fill: #0b1324; stroke: #243247; stroke-width: 2; rx: 14; }
+      .box { fill: #0f172a; stroke: #334155; stroke-width: 2; rx: 12; }
+      .box-light { fill: #111c34; stroke: #415570; stroke-width: 2; rx: 12; }
+      .title { fill: #f8fafc; font: 16px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-weight: 600; }
+      .label { fill: #dbe6f3; font: 12.5px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+      .small { fill: #9fb3c8; font: 11.5px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+      .section { fill: #8fb3ff; font: 14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+      .arrow { stroke: #8aa4c8; stroke-width: 2.4; fill: none; }
+      .dashed { stroke-dasharray: 7 7; }
+      .accent { fill: #16335f; stroke: #4a78b8; stroke-width: 2; rx: 12; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8aa4c8" />
+    </marker>
+  </defs>
+
+  <rect width="1400" height="840" class="bg" />
+
+  <text x="60" y="52" class="title">BitStat Technical Overview</text>
+  <text x="60" y="78" class="small">Owner flows, ingestion, public reads, and the split between Redis hot-path state and Postgres source-of-truth data.</text>
+
+  <rect x="40" y="110" width="280" height="660" class="lane" />
+  <text x="60" y="142" class="section">Actors</text>
+
+  <rect x="65" y="170" width="230" height="120" class="box" />
+  <text x="180" y="210" class="title" text-anchor="middle">Owner Dashboard</text>
+  <text x="180" y="234" class="label" text-anchor="middle">Create game, update metadata,</text>
+  <text x="180" y="255" class="label" text-anchor="middle">create API keys, publish/unpublish</text>
+
+  <rect x="65" y="330" width="230" height="120" class="box" />
+  <text x="180" y="370" class="title" text-anchor="middle">Game Client / SDK</text>
+  <text x="180" y="394" class="label" text-anchor="middle">Push events with API key</text>
+  <text x="180" y="415" class="label" text-anchor="middle">`POST /v1/events/batch`</text>
+
+  <rect x="65" y="490" width="230" height="120" class="box" />
+  <text x="180" y="530" class="title" text-anchor="middle">Public Frontend</text>
+  <text x="180" y="554" class="label" text-anchor="middle">Catalog + leaderboard reads</text>
+  <text x="180" y="575" class="label" text-anchor="middle">No auth</text>
+
+  <rect x="65" y="650" width="230" height="90" class="box-light" />
+  <text x="180" y="686" class="title" text-anchor="middle">Supabase Storage</text>
+  <text x="180" y="709" class="label" text-anchor="middle">Owner uploads artwork directly</text>
+
+  <rect x="360" y="110" width="360" height="660" class="lane" />
+  <text x="380" y="142" class="section">Backend</text>
+
+  <rect x="390" y="210" width="300" height="220" class="box" />
+  <text x="540" y="250" class="title" text-anchor="middle">BitStat API</text>
+  <text x="540" y="275" class="label" text-anchor="middle">Fastify + Zod + rate limits + OpenAPI</text>
+  <text x="540" y="300" class="label" text-anchor="middle">Owner auth with Supabase JWT</text>
+  <text x="540" y="321" class="label" text-anchor="middle">API key auth for ingest and protected reads</text>
+  <text x="540" y="346" class="label" text-anchor="middle">Writes leaderboards, stats, and stream events</text>
+  <text x="540" y="367" class="label" text-anchor="middle">to Redis on the hot path</text>
+  <text x="540" y="392" class="label" text-anchor="middle">Publishes game visibility explicitly</text>
+
+  <rect x="390" y="480" width="300" height="140" class="box" />
+  <text x="540" y="520" class="title" text-anchor="middle">Events Worker</text>
+  <text x="540" y="545" class="label" text-anchor="middle">Redis Streams consumer group</text>
+  <text x="540" y="566" class="label" text-anchor="middle">Reclaims stale pending messages</text>
+  <text x="540" y="591" class="label" text-anchor="middle">Persists raw events and aggregates</text>
+
+  <rect x="390" y="650" width="300" height="90" class="accent" />
+  <text x="540" y="686" class="title" text-anchor="middle">Key Rule</text>
+  <text x="540" y="709" class="label" text-anchor="middle">Postgres is truth. Redis is acceleration.</text>
+
+  <rect x="760" y="110" width="600" height="660" class="lane" />
+  <text x="780" y="142" class="section">Storage and Services</text>
+
+  <rect x="790" y="180" width="250" height="150" class="box-light" />
+  <text x="915" y="220" class="title" text-anchor="middle">Redis</text>
+  <text x="915" y="245" class="label" text-anchor="middle">Leaderboards + player stats</text>
+  <text x="915" y="266" class="label" text-anchor="middle">Dedup keys + dashboard cache</text>
+  <text x="915" y="291" class="label" text-anchor="middle">Public game registry + event streams</text>
+
+  <rect x="790" y="390" width="250" height="170" class="box-light" />
+  <text x="915" y="430" class="title" text-anchor="middle">Supabase Postgres</text>
+  <text x="915" y="455" class="label" text-anchor="middle">Tenants, games, publish state</text>
+  <text x="915" y="476" class="label" text-anchor="middle">API keys (hashed), scoring rules</text>
+  <text x="915" y="501" class="label" text-anchor="middle">Raw events + durable leaderboard tables</text>
+  <text x="915" y="522" class="label" text-anchor="middle">Source of truth</text>
+
+  <rect x="1090" y="180" width="240" height="120" class="box-light" />
+  <text x="1210" y="220" class="title" text-anchor="middle">Supabase Auth</text>
+  <text x="1210" y="245" class="label" text-anchor="middle">JWT for owner endpoints</text>
+  <text x="1210" y="266" class="label" text-anchor="middle">Dashboard identity</text>
+
+  <rect x="1090" y="360" width="240" height="120" class="box-light" />
+  <text x="1210" y="400" class="title" text-anchor="middle">Supabase Storage</text>
+  <text x="1210" y="425" class="label" text-anchor="middle">Game artwork upload</text>
+  <text x="1210" y="446" class="label" text-anchor="middle">Frontend sends resulting URL to API</text>
+
+  <rect x="1090" y="540" width="240" height="150" class="box-light" />
+  <text x="1210" y="580" class="title" text-anchor="middle">Public Surfaces</text>
+  <text x="1210" y="605" class="label" text-anchor="middle">`GET /v1/games`</text>
+  <text x="1210" y="626" class="label" text-anchor="middle">`GET /v1/games/:slug/leaderboards`</text>
+  <text x="1210" y="651" class="label" text-anchor="middle">Visible only when `prod` is published</text>
+
+  <path d="M 295 230 L 390 280" class="arrow" marker-end="url(#arrow)" />
+  <text x="336" y="238" class="small">owner actions</text>
+
+  <path d="M 295 390 L 390 350" class="arrow" marker-end="url(#arrow)" />
+  <text x="334" y="372" class="small">event batches</text>
+
+  <path d="M 295 550 L 390 375" class="arrow" marker-end="url(#arrow)" />
+  <text x="320" y="500" class="small">catalog + leaderboard requests</text>
+
+  <path d="M 295 695 L 390 695" class="arrow dashed" marker-end="url(#arrow)" />
+  <text x="341" y="683" class="small">cover_image_url</text>
+
+  <path d="M 690 310 L 790 255" class="arrow" marker-end="url(#arrow)" />
+  <text x="728" y="270" class="small">hot writes</text>
+
+  <path d="M 690 540 L 790 470" class="arrow" marker-end="url(#arrow)" />
+  <text x="727" y="508" class="small">durable writes</text>
+
+  <path d="M 915 330 L 540 480" class="arrow" marker-end="url(#arrow)" />
+  <text x="700" y="388" class="small">stream consumption</text>
+
+  <path d="M 1040 470 L 1090 615" class="arrow dashed" marker-end="url(#arrow)" />
+  <text x="1058" y="548" class="small">published metadata supports</text>
+  <text x="1064" y="565" class="small">public discovery</text>
+
+  <path d="M 1090 240 L 690 250" class="arrow dashed" marker-end="url(#arrow)" />
+  <text x="875" y="230" class="small">JWT verification</text>
+
+  <path d="M 1090 420 L 690 420" class="arrow dashed" marker-end="url(#arrow)" />
+  <text x="851" y="408" class="small">image URL originates here</text>
+
+  <path d="M 1040 255 L 1090 255" class="arrow" marker-end="url(#arrow)" />
+  <path d="M 1040 485 L 1090 485" class="arrow dashed" marker-end="url(#arrow)" />
+  <path d="M 690 360 L 1090 615" class="arrow" marker-end="url(#arrow)" />
+  <text x="860" y="510" class="small">public reads depend on Redis registry + leaderboard cache</text>
+
+  <rect x="60" y="785" width="210" height="28" class="box-light" />
+  <text x="165" y="804" class="small" text-anchor="middle">Hot path: API -> Redis -> Worker</text>
+
+  <rect x="290" y="785" width="250" height="28" class="box-light" />
+  <text x="415" y="804" class="small" text-anchor="middle">Source of truth: Supabase Postgres</text>
+
+  <rect x="560" y="785" width="290" height="28" class="box-light" />
+  <text x="705" y="804" class="small" text-anchor="middle">Owner images: upload to Supabase Storage first</text>
+
+  <rect x="870" y="785" width="350" height="28" class="box-light" />
+  <text x="1045" y="804" class="small" text-anchor="middle">Public visibility: explicit publish state, not implicit ingest</text>
+</svg>

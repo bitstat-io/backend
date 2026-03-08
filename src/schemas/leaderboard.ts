@@ -8,7 +8,12 @@ export const leaderboardQuerySchema = z.object({
 });
 
 export const leaderboardResponseSchema = z.object({
-  gameSlug: z.string().min(1),
+  game: z.object({
+    slug: z.string().min(1),
+    name: z.string().min(1),
+    game_type: z.string().nullable(),
+    cover_image_url: z.string().nullable(),
+  }),
   window: windowSchema,
   entries: z.array(
     z.object({

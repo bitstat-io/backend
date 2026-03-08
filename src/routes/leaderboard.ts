@@ -23,7 +23,12 @@ export async function leaderboardRoutes(app: FastifyInstance) {
     }
     const entries = await fetchLeaderboard(scope, query.window, query.limit);
     return {
-      gameSlug: scope.gameSlug,
+      game: {
+        slug: scope.gameSlug,
+        name: scope.name,
+        game_type: scope.gameType,
+        cover_image_url: scope.coverImageUrl,
+      },
       window: query.window,
       entries,
     };

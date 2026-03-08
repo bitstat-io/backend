@@ -12,14 +12,11 @@ import { scoreEvent } from '../services/ingest/scoring';
 const STREAM_KEY = key.eventsStream(env.REDIS_STREAM_ENV);
 const GROUP = env.REDIS_STREAM_GROUP;
 const CONSUMER = env.REDIS_STREAM_CONSUMER ?? `${os.hostname()}-${process.pid}`;
+const CLAIM_START_ID = '0-0';
 
-if (!env.SUPABASE_DB_URL) {
-  throw new Error('SUPABASE_DB_URL is required to run the events worker.');
-}
+const pool = env.SUPABASE_DB_URL ? new Pool({ connectionString: env.SUPABASE_DB_URL, max: 2 }) : null;
 
-const pool = new Pool({ connectionString: env.SUPABASE_DB_URL, max: 2 });
-
-type StreamRecord = {
+export type StreamRecord = {
   id: string;
   fields: Record<string, string>;
 };
@@ -31,7 +28,7 @@ type EventRow = [
   string, // user_id
   string, // session_id
   string, // event_id
-  string, // game_type
+  string | null, // game_type
   Date, // client_ts
   Date, // server_ts
   string, // event_properties json
@@ -43,9 +40,17 @@ type LeaderboardAllRow = [string, string, string, number];
 
 type LeaderboardDailyRow = [string, string, string, string, number];
 
+type InsertedEventAggregate = {
+  game_id: string;
+  env: string;
+  user_id: string;
+  score: number;
+  day: string | Date;
+};
+
 async function ensureGroup() {
   try {
-    await redis.xgroup('CREATE', STREAM_KEY, GROUP, '$', 'MKSTREAM');
+    await redis.xgroup('CREATE', STREAM_KEY, GROUP, '0', 'MKSTREAM');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!message.includes('BUSYGROUP')) throw error;
@@ -60,6 +65,18 @@ function toFieldMap(fields: string[]): Record<string, string> {
     if (key) record[key] = value ?? '';
   }
   return record;
+}
+
+export function toStreamRecords(entries: unknown): StreamRecord[] {
+  if (!Array.isArray(entries)) return [];
+
+  return entries.flatMap((entry) => {
+    if (!Array.isArray(entry) || entry.length < 2) return [];
+    const [id, fields] = entry;
+    if (typeof id !== 'string' || !Array.isArray(fields)) return [];
+    const values = fields.every((value) => typeof value === 'string') ? (fields as string[]) : [];
+    return values.length > 0 ? [{ id, fields: toFieldMap(values) }] : [];
+  });
 }
 
 function buildInsertQuery(
@@ -112,10 +129,40 @@ function parseRecord(record: StreamRecord) {
   };
 }
 
-async function writeBatch(records: StreamRecord[]) {
-  const eventRows: EventRow[] = [];
+export function buildLeaderboardRows(rows: InsertedEventAggregate[]) {
   const allMap = new Map<string, LeaderboardAllRow>();
   const dailyMap = new Map<string, LeaderboardDailyRow>();
+
+  for (const row of rows) {
+    const gameId = String(row.game_id);
+    const envName = String(row.env);
+    const userId = String(row.user_id);
+    const score = Number(row.score ?? 0);
+    const day = normalizeDay(row.day);
+
+    const allKey = `${gameId}|${envName}|${userId}`;
+    const allRow = allMap.get(allKey) ?? [gameId, envName, userId, 0];
+    allRow[3] += score;
+    allMap.set(allKey, allRow);
+
+    const dailyKey = `${gameId}|${envName}|${day}|${userId}`;
+    const dailyRow = dailyMap.get(dailyKey) ?? [gameId, envName, day, userId, 0];
+    dailyRow[4] += score;
+    dailyMap.set(dailyKey, dailyRow);
+  }
+
+  return {
+    leaderboardAllRows: Array.from(allMap.values()),
+    leaderboardDailyRows: Array.from(dailyMap.values()),
+  };
+}
+
+async function writeBatch(records: StreamRecord[]) {
+  if (!pool) {
+    throw new Error('SUPABASE_DB_URL is required to run the events worker.');
+  }
+
+  const eventRows: EventRow[] = [];
   const invalidIds: string[] = [];
 
   for (const record of records) {
@@ -142,23 +189,13 @@ async function writeBatch(records: StreamRecord[]) {
       event.user_id,
       event.session_id,
       event.event_id,
-      event.game_type ?? 'other',
+      event.game_type ?? null,
       clientDate,
       new Date(),
       JSON.stringify(event.event_properties ?? {}),
       score,
       dedupId,
     ]);
-
-    const allKey = `${gameId}|${envName}|${event.user_id}`;
-    const allRow = allMap.get(allKey) ?? [gameId, envName, event.user_id, 0];
-    allRow[3] += score;
-    allMap.set(allKey, allRow);
-
-    const dailyKey = `${gameId}|${envName}|${day}|${event.user_id}`;
-    const dailyRow = dailyMap.get(dailyKey) ?? [gameId, envName, day, event.user_id, 0];
-    dailyRow[4] += score;
-    dailyMap.set(dailyKey, dailyRow);
   }
 
   if (eventRows.length === 0) {
@@ -173,7 +210,7 @@ async function writeBatch(records: StreamRecord[]) {
     await client.query('BEGIN');
 
     const eventInsert = buildInsertQuery(
-      'ingest.events',
+      'public.events',
       [
         'tenant_id',
         'game_id',
@@ -189,21 +226,22 @@ async function writeBatch(records: StreamRecord[]) {
         'dedup_id',
       ],
       eventRows,
-      'ON CONFLICT (game_id, env, dedup_id) DO NOTHING',
+      'ON CONFLICT (game_id, env, dedup_id) DO NOTHING returning game_id, env, user_id, score, client_ts::date as day',
     );
 
+    let insertedRows: InsertedEventAggregate[] = [];
     if (eventInsert) {
-      await client.query(eventInsert.text, eventInsert.values);
+      const result = await client.query(eventInsert.text, eventInsert.values);
+      insertedRows = result.rows as InsertedEventAggregate[];
     }
 
-    const leaderboardAllRows = Array.from(allMap.values());
-    const leaderboardDailyRows = Array.from(dailyMap.values());
+    const { leaderboardAllRows, leaderboardDailyRows } = buildLeaderboardRows(insertedRows);
 
     const allInsert = buildInsertQuery(
-      'analytics.leaderboard_all',
+      'public.leaderboard_all',
       ['game_id', 'env', 'user_id', 'score'],
       leaderboardAllRows,
-      'ON CONFLICT (game_id, env, user_id) DO UPDATE SET score = analytics.leaderboard_all.score + EXCLUDED.score',
+      'ON CONFLICT (game_id, env, user_id) DO UPDATE SET score = public.leaderboard_all.score + EXCLUDED.score',
     );
 
     if (allInsert) {
@@ -211,10 +249,10 @@ async function writeBatch(records: StreamRecord[]) {
     }
 
     const dailyInsert = buildInsertQuery(
-      'analytics.leaderboard_daily',
+      'public.leaderboard_daily',
       ['game_id', 'env', 'day', 'user_id', 'score'],
       leaderboardDailyRows,
-      'ON CONFLICT (game_id, env, day, user_id) DO UPDATE SET score = analytics.leaderboard_daily.score + EXCLUDED.score',
+      'ON CONFLICT (game_id, env, day, user_id) DO UPDATE SET score = public.leaderboard_daily.score + EXCLUDED.score',
     );
 
     if (dailyInsert) {
@@ -235,33 +273,63 @@ async function writeBatch(records: StreamRecord[]) {
   }
 }
 
+async function claimPendingBatch(): Promise<StreamRecord[]> {
+  const result = await redis.xautoclaim(
+    STREAM_KEY,
+    GROUP,
+    CONSUMER,
+    env.REDIS_STREAM_RECLAIM_MIN_IDLE_MS,
+    CLAIM_START_ID,
+    'COUNT',
+    env.REDIS_STREAM_BATCH_SIZE,
+  );
+
+  if (!Array.isArray(result) || result.length < 2) {
+    return [];
+  }
+
+  return toStreamRecords(result[1]);
+}
+
+async function readNewBatch(): Promise<StreamRecord[]> {
+  const result = await redis.xreadgroup(
+    'GROUP',
+    GROUP,
+    CONSUMER,
+    'COUNT',
+    env.REDIS_STREAM_BATCH_SIZE,
+    'BLOCK',
+    env.REDIS_STREAM_BLOCK_MS,
+    'STREAMS',
+    STREAM_KEY,
+    '>',
+  );
+
+  if (!Array.isArray(result) || result.length === 0) {
+    return [];
+  }
+
+  const stream = result[0];
+  if (!Array.isArray(stream) || stream.length < 2) {
+    return [];
+  }
+
+  return toStreamRecords(stream[1]);
+}
+
 async function run() {
+  if (!pool) {
+    throw new Error('SUPABASE_DB_URL is required to run the events worker.');
+  }
+
   await ensureGroup();
 
   // eslint-disable-next-line no-console
   console.log(`Worker connected. stream=${STREAM_KEY} group=${GROUP} consumer=${CONSUMER}`);
 
   while (true) {
-    const result = await redis.xreadgroup(
-      'GROUP',
-      GROUP,
-      CONSUMER,
-      'COUNT',
-      env.REDIS_STREAM_BATCH_SIZE,
-      'BLOCK',
-      env.REDIS_STREAM_BLOCK_MS,
-      'STREAMS',
-      STREAM_KEY,
-      '>',
-    );
-
-    if (!result || result.length === 0) continue;
-
-    const streamEntries = result[0]?.[1] ?? [];
-    const records: StreamRecord[] = streamEntries.map(([id, fields]: [string, string[]]) => ({
-      id,
-      fields: toFieldMap(fields),
-    }));
+    const reclaimed = await claimPendingBatch();
+    const records = reclaimed.length > 0 ? reclaimed : await readNewBatch();
 
     if (records.length === 0) continue;
 
@@ -277,11 +345,20 @@ async function run() {
 
 function shutdown() {
   void redis.quit();
-  void pool.end();
+  void pool?.end();
   process.exit(0);
 }
 
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-void run();
+function normalizeDay(value: string | Date) {
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+  return String(value);
+}
+
+if (require.main === module) {
+  void run();
+}

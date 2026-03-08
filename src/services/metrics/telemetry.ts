@@ -1,4 +1,4 @@
-import type { Pipeline } from 'ioredis';
+import type { ChainableCommander } from 'ioredis';
 
 import type { Event } from '../../schemas/events';
 import type { GameScope } from '../../auth/types';
@@ -16,7 +16,9 @@ const LOG_TTL_SECONDS = 24 * 60 * 60;
 const LOG_MAX_ITEMS = 60;
 const REJECT_LOG_MAX_ITEMS = 80;
 
-export function recordEventTelemetry(pipeline: Pipeline, scope: GameScope, event: Event, eventDate: Date) {
+type RedisChain = ChainableCommander;
+
+export function recordEventTelemetry(pipeline: RedisChain, scope: GameScope, event: Event, eventDate: Date) {
   const epochSec = epochSecond(eventDate);
   const epochMin = epochMinute(eventDate);
   const epochHr = epochHour(eventDate);
@@ -51,10 +53,11 @@ export function recordEventTelemetry(pipeline: Pipeline, scope: GameScope, event
   pipeline.expire(key.gameEventsHour(scope, epochHr), TTL_SECONDS.hour);
   pipeline.expire(key.gameEventsDay(scope, day), TTL_SECONDS.day);
 
-  if (event.game_type === 'mobile') {
-    pipeline.zincrby(key.gameIapMinute(scope, epochMin), event.event_properties.iap_amount, scope.gameId);
-    pipeline.zincrby(key.gameIapHour(scope, epochHr), event.event_properties.iap_amount, scope.gameId);
-    pipeline.zincrby(key.gameIapDay(scope, day), event.event_properties.iap_amount, scope.gameId);
+  const iap = getNumber(event.event_properties, 'iap_amount');
+  if (iap > 0) {
+    pipeline.zincrby(key.gameIapMinute(scope, epochMin), iap, scope.gameId);
+    pipeline.zincrby(key.gameIapHour(scope, epochHr), iap, scope.gameId);
+    pipeline.zincrby(key.gameIapDay(scope, day), iap, scope.gameId);
     pipeline.expire(key.gameIapMinute(scope, epochMin), TTL_SECONDS.minute);
     pipeline.expire(key.gameIapHour(scope, epochHr), TTL_SECONDS.hour);
     pipeline.expire(key.gameIapDay(scope, day), TTL_SECONDS.day);
@@ -63,7 +66,7 @@ export function recordEventTelemetry(pipeline: Pipeline, scope: GameScope, event
   recordEventLog(pipeline, scope, event, eventDate);
 }
 
-export function recordRejections(pipeline: Pipeline, scope: GameScope, count: number, at: Date) {
+export function recordRejections(pipeline: RedisChain, scope: GameScope, count: number, at: Date) {
   if (count <= 0) return;
   const epochSec = epochSecond(at);
   const epochMin = epochMinute(at);
@@ -81,7 +84,7 @@ export function recordRejections(pipeline: Pipeline, scope: GameScope, count: nu
   pipeline.expire(key.aggDay(scope, day), TTL_SECONDS.day);
 }
 
-export function recordErrors(pipeline: Pipeline, scope: GameScope, count: number, at: Date) {
+export function recordErrors(pipeline: RedisChain, scope: GameScope, count: number, at: Date) {
   if (count <= 0) return;
   const epochSec = epochSecond(at);
   const epochMin = epochMinute(at);
@@ -99,40 +102,34 @@ export function recordErrors(pipeline: Pipeline, scope: GameScope, count: number
   pipeline.expire(key.aggDay(scope, day), TTL_SECONDS.day);
 }
 
-function incrementAgg(pipeline: Pipeline, aggKey: string, event: Event) {
+function incrementAgg(pipeline: RedisChain, aggKey: string, event: Event) {
   pipeline.hincrby(aggKey, 'events', 1);
   pipeline.hincrby(aggKey, 'accepted', 1);
-  if (event.game_type === 'fps') {
-    pipeline.hincrby(aggKey, 'fps', 1);
-    if (event.event_id === 'match_complete') {
-      pipeline.hincrby(aggKey, 'matches', 1);
-    }
-    return;
+  if (event.event_id === 'match_complete') {
+    pipeline.hincrby(aggKey, 'matches', 1);
   }
-  if (event.game_type === 'mobile') {
-    pipeline.hincrby(aggKey, 'mobile', 1);
-    if (event.event_id === 'session_start') {
-      pipeline.hincrby(aggKey, 'sessions', 1);
-    }
-    const iap = getNumber(event.event_properties, 'iap_amount');
-    if (iap > 0) {
-      pipeline.hincrbyfloat(aggKey, 'iap', iap);
-    }
+  if (event.event_id === 'session_start') {
+    pipeline.hincrby(aggKey, 'sessions', 1);
+  }
+  const iap = getNumber(event.event_properties, 'iap_amount');
+  if (iap > 0) {
+    pipeline.hincrbyfloat(aggKey, 'iap', iap);
+    pipeline.hincrby(aggKey, 'purchases', 1);
   }
 }
 
-function incrementAggCount(pipeline: Pipeline, aggKey: string, field: string, count: number) {
+function incrementAggCount(pipeline: RedisChain, aggKey: string, field: string, count: number) {
   pipeline.hincrby(aggKey, field, count);
 }
 
-function recordEventLog(pipeline: Pipeline, scope: GameScope, event: Event, eventDate: Date) {
+function recordEventLog(pipeline: RedisChain, scope: GameScope, event: Event, eventDate: Date) {
   const payload = JSON.stringify({
     ts: eventDate.toISOString(),
     game_id: scope.gameId,
     game_slug: scope.gameSlug,
     event_id: event.event_id,
     user_id: event.user_id,
-    game_type: event.game_type,
+    game_type: event.game_type ?? null,
     platform: event.platform ?? null,
     region: event.region ?? null,
   });
@@ -143,7 +140,7 @@ function recordEventLog(pipeline: Pipeline, scope: GameScope, event: Event, even
   pipeline.expire(logKey, LOG_TTL_SECONDS);
 }
 
-export function recordRejectedLog(pipeline: Pipeline, scope: GameScope, entries: string[]) {
+export function recordRejectedLog(pipeline: RedisChain, scope: GameScope, entries: string[]) {
   if (entries.length === 0) return;
   const logKey = key.eventRejectLog(scope);
   pipeline.lpush(logKey, ...entries);

@@ -6,7 +6,7 @@ const categorySchema = z
   .max(50)
   .regex(/^[a-z0-9_-]{2,50}$/, 'category must match ^[a-z0-9_-]{2,50}$');
 
-const gameTypeSchema = z.string().min(1).max(50);
+const gameTypeSchema = z.string().trim().min(1).max(100);
 
 const baseEvent = z.object({
   user_id: z.string().min(1),
@@ -15,7 +15,7 @@ const baseEvent = z.object({
   v: z.coerce.number().int().min(1).optional(),
   category: categorySchema,
   event_id: z.string().min(1),
-  game_type: gameTypeSchema.optional().default('other'),
+  game_type: gameTypeSchema.optional(),
   platform: z.enum(['pc', 'console', 'mobile']).optional(),
   region: z.enum(['na', 'eu', 'apac', 'latam']).optional(),
   event_properties: z.record(z.unknown()),

@@ -12,8 +12,9 @@ type TrafficPoint = {
   accepted: number;
   rejected: number;
   errors: number;
-  fps: number;
-  mobile: number;
+  matches: number;
+  sessions: number;
+  purchases: number;
   iap: number;
 };
 
@@ -48,8 +49,9 @@ export async function getDashboardOverview(range: Range, scope: GameScope) {
       accepted: toInt(result?.accepted),
       rejected: toInt(result?.rejected),
       errors: toInt(result?.errors),
-      fps: toInt(result?.fps),
-      mobile: toInt(result?.mobile),
+      matches: toInt(result?.matches),
+      sessions: toInt(result?.sessions),
+      purchases: toInt(result?.purchases),
       iap: toFloat(result?.iap),
     };
   });
@@ -60,12 +62,13 @@ export async function getDashboardOverview(range: Range, scope: GameScope) {
       acc.accepted += point.accepted;
       acc.rejected += point.rejected;
       acc.errors += point.errors;
-      acc.fps += point.fps;
-      acc.mobile += point.mobile;
+      acc.matches += point.matches;
+      acc.sessions += point.sessions;
+      acc.purchases += point.purchases;
       acc.iap += point.iap;
       return acc;
     },
-    { events: 0, accepted: 0, rejected: 0, errors: 0, fps: 0, mobile: 0, iap: 0 },
+    { events: 0, accepted: 0, rejected: 0, errors: 0, matches: 0, sessions: 0, purchases: 0, iap: 0 },
   );
 
   const totalObserved = totals.accepted + totals.rejected + totals.errors;
@@ -90,8 +93,9 @@ export async function getDashboardOverview(range: Range, scope: GameScope) {
       uniquePlayers,
       errorRate,
       rejectRate,
-      fpsEvents: totals.fps,
-      mobileEvents: totals.mobile,
+      matches: totals.matches,
+      sessions: totals.sessions,
+      purchases: totals.purchases,
       iap: totals.iap,
       eventsPerSec,
     },
@@ -251,7 +255,7 @@ async function getRecentEvents(scope: GameScope, limit: number) {
           game_slug: string;
           event_id: string;
           user_id: string;
-          game_type: string;
+          game_type: string | null;
           platform: string | null;
           region: string | null;
         };

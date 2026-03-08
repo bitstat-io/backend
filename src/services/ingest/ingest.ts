@@ -1,4 +1,4 @@
-import type { Pipeline } from 'ioredis';
+import type { ChainableCommander } from 'ioredis';
 
 import { env } from '../../config/env';
 import { redis } from '../../redis/client';
@@ -9,7 +9,6 @@ import { dayId, toDateFromClientTs, MS_PER_DAY } from '../../utils/time';
 import { scoreEvent } from './scoring';
 import { getScoringRule } from './rules';
 import { recordErrors, recordEventTelemetry, recordRejections, recordRejectedLog } from '../metrics/telemetry';
-import { registerPublicGame } from '../games/registry';
 
 export type IngestResult = {
   accepted: number;
@@ -33,6 +32,8 @@ type Candidate = {
   dedupId: string;
   raw: unknown;
 };
+
+type RedisChain = ChainableCommander;
 
 export async function ingestEvents(scope: GameScope, rawEvents: unknown[]): Promise<IngestResult> {
   let accepted = 0;
@@ -132,7 +133,6 @@ export async function ingestEvents(scope: GameScope, rawEvents: unknown[]): Prom
   if (errors === 0 && acceptedEvents.length > 0) {
     const transaction = redis.multi();
     const scoringRule = await getScoringRule(scope.gameId);
-    await registerPublicGame(scope, transaction);
     accepted = acceptedEvents.length;
 
     for (const candidate of acceptedEvents) {
@@ -243,27 +243,26 @@ function buildDedupId(event: Event) {
   return `${event.user_id}:${event.session_id}:${event.event_id}:${event.client_ts}`;
 }
 
-function updateStats(pipeline: Pipeline, scope: GameScope, event: Event) {
+function updateStats(pipeline: RedisChain, scope: GameScope, event: Event) {
   const statsKey = key.stats(scope, event.user_id);
 
   pipeline.hincrby(statsKey, 'events', 1);
-  if (event.game_type === 'fps') {
-    pipeline.hincrby(statsKey, 'kills', toInt(event.event_properties, 'kills'));
-    pipeline.hincrby(statsKey, 'deaths', toInt(event.event_properties, 'deaths'));
-    pipeline.hincrby(statsKey, 'assists', toInt(event.event_properties, 'assists'));
-    if (event.event_id === 'match_complete') {
-      pipeline.hincrby(statsKey, 'matches', 1);
-    }
-    return;
+  pipeline.hincrby(statsKey, 'kills', toInt(event.event_properties, 'kills'));
+  pipeline.hincrby(statsKey, 'deaths', toInt(event.event_properties, 'deaths'));
+  pipeline.hincrby(statsKey, 'assists', toInt(event.event_properties, 'assists'));
+  pipeline.hincrby(statsKey, 'coins', toInt(event.event_properties, 'coins'));
+  pipeline.hincrby(statsKey, 'level', toInt(event.event_properties, 'level'));
+
+  const iapAmount = toNumber(event.event_properties, 'iap_amount');
+  if (iapAmount !== 0) {
+    pipeline.hincrbyfloat(statsKey, 'iap_amount', iapAmount);
   }
 
-  if (event.game_type === 'mobile') {
-    pipeline.hincrby(statsKey, 'coins', toInt(event.event_properties, 'coins'));
-    pipeline.hincrby(statsKey, 'level', toInt(event.event_properties, 'level'));
-    pipeline.hincrbyfloat(statsKey, 'iap_amount', toNumber(event.event_properties, 'iap_amount'));
-    if (event.event_id === 'session_start') {
-      pipeline.hincrby(statsKey, 'sessions', 1);
-    }
+  if (event.event_id === 'match_complete') {
+    pipeline.hincrby(statsKey, 'matches', 1);
+  }
+  if (event.event_id === 'session_start') {
+    pipeline.hincrby(statsKey, 'sessions', 1);
   }
 }
 

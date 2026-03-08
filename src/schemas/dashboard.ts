@@ -13,8 +13,9 @@ export const trafficPointSchema = z.object({
   accepted: z.number().int().nonnegative(),
   rejected: z.number().int().nonnegative(),
   errors: z.number().int().nonnegative(),
-  fps: z.number().int().nonnegative(),
-  mobile: z.number().int().nonnegative(),
+  matches: z.number().int().nonnegative(),
+  sessions: z.number().int().nonnegative(),
+  purchases: z.number().int().nonnegative(),
   iap: z.number().nonnegative(),
 });
 
@@ -25,7 +26,7 @@ export const eventLogSchema = z.object({
   game_slug: z.string().min(1),
   event_id: z.string().min(1),
   user_id: z.string().min(1),
-  game_type: z.string().min(1),
+  game_type: z.string().nullable(),
   platform: z.string().nullable(),
   region: z.string().nullable(),
 });
@@ -53,8 +54,9 @@ export const dashboardResponseSchema = z.object({
     uniquePlayers: z.number().int().nonnegative(),
     errorRate: z.number().nonnegative(),
     rejectRate: z.number().nonnegative(),
-    fpsEvents: z.number().int().nonnegative(),
-    mobileEvents: z.number().int().nonnegative(),
+    matches: z.number().int().nonnegative(),
+    sessions: z.number().int().nonnegative(),
+    purchases: z.number().int().nonnegative(),
     iap: z.number().nonnegative(),
     eventsPerSec: z.number().nonnegative(),
   }),

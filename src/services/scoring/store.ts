@@ -12,7 +12,7 @@ export async function fetchActiveRule(gameId: string): Promise<StoredRule | null
   if (!db) return null;
 
   const result = await db.query(
-    'select version, rules, is_active from core.scoring_rules where game_id = $1 and is_active = true order by version desc limit 1',
+    'select version, rules, is_active from public.scoring_rules where game_id = $1 and is_active = true order by version desc limit 1',
     [gameId],
   );
 
@@ -36,17 +36,17 @@ export async function createRule(gameId: string, payload: ScoringRulePayload): P
   try {
     await client.query('BEGIN');
 
-    const versionResult = await client.query('select coalesce(max(version), 0) as version from core.scoring_rules where game_id = $1', [
+    const versionResult = await client.query('select coalesce(max(version), 0) as version from public.scoring_rules where game_id = $1', [
       gameId,
     ]);
     const nextVersion = Number(versionResult.rows[0]?.version ?? 0) + 1;
 
-    await client.query('update core.scoring_rules set is_active = false where game_id = $1 and is_active = true', [
+    await client.query('update public.scoring_rules set is_active = false where game_id = $1 and is_active = true', [
       gameId,
     ]);
 
     const insert = await client.query(
-      'insert into core.scoring_rules (game_id, version, rules, is_active) values ($1, $2, $3, true) returning version, rules, is_active',
+      'insert into public.scoring_rules (game_id, version, rules, is_active) values ($1, $2, $3, true) returning version, rules, is_active',
       [gameId, nextVersion, payload],
     );
 
@@ -73,7 +73,7 @@ export async function listRuleVersions(gameId: string): Promise<Array<{ version:
   }
 
   const result = await db.query(
-    'select version, is_active, created_at from core.scoring_rules where game_id = $1 order by version desc',
+    'select version, is_active, created_at from public.scoring_rules where game_id = $1 order by version desc',
     [gameId],
   );
 
@@ -90,7 +90,7 @@ export async function deactivateRules(gameId: string): Promise<void> {
     throw new Error('DB_UNAVAILABLE');
   }
 
-  await db.query('update core.scoring_rules set is_active = false where game_id = $1 and is_active = true', [gameId]);
+  await db.query('update public.scoring_rules set is_active = false where game_id = $1 and is_active = true', [gameId]);
 }
 
 export async function activateRuleVersion(gameId: string, version: number): Promise<StoredRule | null> {
@@ -104,7 +104,7 @@ export async function activateRuleVersion(gameId: string, version: number): Prom
     await client.query('BEGIN');
 
     const target = await client.query(
-      'select version, rules, is_active from core.scoring_rules where game_id = $1 and version = $2 limit 1',
+      'select version, rules, is_active from public.scoring_rules where game_id = $1 and version = $2 limit 1',
       [gameId, version],
     );
     const row = target.rows[0];
@@ -113,8 +113,8 @@ export async function activateRuleVersion(gameId: string, version: number): Prom
       return null;
     }
 
-    await client.query('update core.scoring_rules set is_active = false where game_id = $1 and is_active = true', [gameId]);
-    await client.query('update core.scoring_rules set is_active = true where game_id = $1 and version = $2', [
+    await client.query('update public.scoring_rules set is_active = false where game_id = $1 and is_active = true', [gameId]);
+    await client.query('update public.scoring_rules set is_active = true where game_id = $1 and version = $2', [
       gameId,
       version,
     ]);

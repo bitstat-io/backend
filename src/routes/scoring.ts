@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import { requireApiKey, requireGameSlugMatch } from '../auth/guard';
@@ -20,8 +20,8 @@ export async function scoringRoutes(app: FastifyInstance) {
   });
 
   async function resolveScoringTarget(
-    request: Parameters<Parameters<typeof app.get>[2]>[0],
-    reply: Parameters<Parameters<typeof app.get>[2]>[1],
+    request: FastifyRequest,
+    reply: FastifyReply,
     gameSlug: string,
     requiredScopes: Array<'read' | 'admin'>,
   ) {

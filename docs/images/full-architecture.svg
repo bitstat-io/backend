@@ -16,7 +16,7 @@
   <rect x="40" y="40" width="260" height="120" class="box" />
   <text x="170" y="80" class="title" text-anchor="middle">Admin Frontend</text>
   <text x="170" y="103" class="label" text-anchor="middle">Supabase OAuth</text>
-  <text x="170" y="125" class="label" text-anchor="middle">Dashboard + Key Mgmt</text>
+  <text x="170" y="125" class="label" text-anchor="middle">Dashboard + Publish + Keys</text>
 
   <rect x="40" y="210" width="260" height="120" class="box" />
   <text x="170" y="250" class="title" text-anchor="middle">Game Client / SDK</text>
@@ -33,7 +33,7 @@
   <text x="510" y="228" class="label" text-anchor="middle">Auth: API key or JWT</text>
   <text x="510" y="250" class="label" text-anchor="middle">Ingest + Leaderboards</text>
   <text x="510" y="272" class="label" text-anchor="middle">Dashboard SSE + Rules</text>
-  <text x="510" y="294" class="label" text-anchor="middle">Key Mgmt Endpoints</text>
+  <text x="510" y="294" class="label" text-anchor="middle">Owner flows + key endpoints</text>
 
   <rect x="720" y="60" width="270" height="140" class="box-light" />
   <text x="855" y="100" class="title" text-anchor="middle">Redis</text>
@@ -49,8 +49,8 @@
   <rect x="1040" y="60" width="300" height="140" class="box-light" />
   <text x="1190" y="100" class="title" text-anchor="middle">Supabase</text>
   <text x="1190" y="123" class="label" text-anchor="middle">Events + Aggregates</text>
-  <text x="1190" y="145" class="label" text-anchor="middle">Scoring rules</text>
-  <text x="1190" y="167" class="label" text-anchor="middle">API keys (hashed + encrypted)</text>
+  <text x="1190" y="145" class="label" text-anchor="middle">Games + publish state + rules</text>
+  <text x="1190" y="167" class="label" text-anchor="middle">API keys (hashed)</text>
 
   <rect x="1040" y="240" width="300" height="140" class="box-light" />
   <text x="1190" y="282" class="title" text-anchor="middle">Retention Job</text>

@@ -12,7 +12,7 @@ import {
 import { env } from './config/env';
 import { registerRoutes } from './routes';
 
-async function buildServer() {
+export async function buildServer() {
   const app = Fastify({
     logger: {
       level: 'info',
@@ -66,8 +66,8 @@ async function buildServer() {
       },
     },
     transform: jsonSchemaTransform,
-    transformObject({ openapiObject }) {
-      const api = openapiObject as any;
+    transformObject(input: any) {
+      const api = input.openapiObject as any;
       const paths = api.paths ?? {};
 
       const ingestExample = {
@@ -127,11 +127,29 @@ async function buildServer() {
       setResponseExample('/v1/events/batch', 'post', '200', { accepted: 2, rejected: 0 });
 
       setResponseExample('/v1/games', 'get', '200', {
-        games: [{ game_slug: 'tetris' }, { game_slug: 'space-racer' }],
+        games: [
+          {
+            game_slug: 'tetris',
+            name: 'Tetris',
+            game_type: 'puzzle',
+            cover_image_url: 'https://cdn.example.com/games/tetris.png',
+          },
+          {
+            game_slug: 'space-racer',
+            name: 'Space Racer',
+            game_type: 'racer',
+            cover_image_url: 'https://cdn.example.com/games/space-racer.png',
+          },
+        ],
       });
 
       setResponseExample('/v1/games/{gameSlug}/leaderboards', 'get', '200', {
-        gameSlug: 'tetris',
+        game: {
+          slug: 'tetris',
+          name: 'Tetris',
+          game_type: 'puzzle',
+          cover_image_url: 'https://cdn.example.com/games/tetris.png',
+        },
         window: '1d',
         entries: [
           { rank: 1, user_id: 'player_123', score: 230 },
@@ -140,7 +158,12 @@ async function buildServer() {
       });
 
       setResponseExample('/v1/games/dev/{gameSlug}/leaderboards', 'get', '200', {
-        gameSlug: 'tetris',
+        game: {
+          slug: 'tetris',
+          name: 'Tetris',
+          game_type: 'puzzle',
+          cover_image_url: 'https://cdn.example.com/games/tetris.png',
+        },
         window: '1d',
         entries: [
           { rank: 1, user_id: 'player_123', score: 230 },
@@ -372,4 +395,6 @@ async function start() {
   }
 }
 
-void start();
+if (require.main === module) {
+  void start();
+}

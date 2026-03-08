@@ -15,6 +15,40 @@ BitStat is a Fastify API that ingests game events, builds leaderboards, and expo
 **System Diagram**
 ![System Overview](images/system-overview.svg)
 
+## Technical Overview
+This diagram is the fastest way to understand the MVP architecture end to end: who talks to the backend, what the API writes immediately, what the worker persists later, and which systems own truth versus cache.
+
+![Technical Overview](images/technical-overview.svg)
+
+## Tech Stack
+- Runtime: Node.js with TypeScript
+- API framework: Fastify
+- Validation and API schemas: Zod with `fastify-type-provider-zod`
+- Durable storage: Supabase Postgres
+- Hot data and queueing: Redis with Redis Streams
+- Auth: Supabase JWT verification with `jose`
+- API documentation: Fastify Swagger / OpenAPI
+- Tests: Vitest
+
+## Architecture Decisions
+- Postgres is the source of truth for tenants, games, publish state, API keys, scoring rules, and raw event history.
+- Redis is the hot path for ingestion, leaderboards, dashboard metrics, deduplication, and worker buffering.
+- Public visibility is explicit. A game becomes public only when the owner publishes `dev` or `prod`.
+- `game_type` is free-form metadata, not a hard taxonomy. Scoring and stats should not depend on a fixed list of genres.
+- API keys are stored as `key_hash` plus `key_prefix`. The backend returns the raw key once at creation time and does not support later retrieval.
+- Images are not uploaded through this backend. Owners upload artwork to Supabase Storage and store the resulting `cover_image_url` on the game record.
+- Ingestion is optimized for low-latency writes. The API writes to Redis first, then a worker persists durable records and aggregates to Postgres.
+- The MVP favors operational simplicity over perfect fault isolation. Redis is required for the live ingest and public registry paths today.
+
+## Implementation Approach
+- The API process owns request validation, authentication, authorization, rate limiting, and fast writes to Redis.
+- The worker process owns Redis Stream consumption, stale pending-message reclaim, and durable writes into Postgres leaderboard and raw event tables.
+- Public leaderboard reads prefer Redis for speed and fall back to Postgres leaderboard aggregates when leaderboard cache data is missing.
+- Public game discovery uses a Redis-backed registry keyed by publish state, with Postgres used to rebuild missing registry entries.
+- Owner flows are explicit backend actions: create game, update metadata, create API key, publish, and unpublish.
+- Scoring is applied during ingest using per-game rules from `public.scoring_rules` when available, with a simple event-property fallback for MVP usage.
+- Stats are generic and event-driven. The backend increments common counters like `matches` and `sessions`, and aggregates numeric properties such as `kills`, `coins`, and `iap_amount`.
+
 ## Architecture Notes
 - Every write is scoped by API key to `{tenantId, gameId, env}`.
 - `env` is `dev` or `prod` and is stored with every record.
@@ -22,7 +56,7 @@ BitStat is a Fastify API that ingests game events, builds leaderboards, and expo
 - Raw events are retained for 3 months; aggregates are retained forever.
 - The API writes to Redis; a worker flushes to Supabase via Redis Streams.
 - Scoring rules can be stored per game in Supabase and applied during ingest.
-- API keys are stored in Supabase (hashed for lookup, encrypted for retrieval).
+- API keys are stored in Supabase as `key_hash` plus `key_prefix`.
 
 ## Data Flow
 
@@ -38,9 +72,12 @@ BitStat is a Fastify API that ingests game events, builds leaderboards, and expo
 
 ### Leaderboard Read Flow
 1. Frontend calls a public leaderboard endpoint.
-2. API resolves the game slug in the public registry for the requested env.
-3. API reads from Redis leaderboard keys.
-4. API responds with ranked entries.
+2. API resolves the game slug in the Redis public registry for the requested env.
+3. If the cached registry entry is missing, API can rebuild it from Postgres publish state.
+4. API reads from Redis leaderboard keys.
+5. API responds with ranked entries.
+
+Note: public registry lookups still require Redis to be reachable. The current Postgres recovery path handles missing cache entries, not full Redis outages.
 
 ![Leaderboard Flow](images/leaderboard-flow.svg)
 
@@ -76,9 +113,11 @@ BitStat is a Fastify API that ingests game events, builds leaderboards, and expo
 ### Supabase JWT (Owner) Only
 - `GET /v1/dashboard/games`
 - `POST /v1/dashboard/games`
+- `PUT /v1/dashboard/games/:gameSlug`
+- `PUT /v1/dashboard/games/:gameSlug/publish`
+- `PUT /v1/dashboard/games/:gameSlug/unpublish`
 - `GET /v1/dashboard/games/:gameSlug/api-keys`
 - `POST /v1/dashboard/games/:gameSlug/api-keys`
-- `GET /v1/dashboard/games/:gameSlug/api-keys/:keyId` (explicit key retrieval)
 - `DELETE /v1/dashboard/games/:gameSlug/api-keys/:keyId`
 
 ## API Data Formats
@@ -329,9 +368,6 @@ Response (includes `key` on create)
 }
 ```
 
-### `GET /v1/dashboard/games/:gameSlug/api-keys/:keyId`
-Response: same shape as `POST /v1/dashboard/games/:gameSlug/api-keys`
-
 ### `DELETE /v1/dashboard/games/:gameSlug/api-keys/:keyId`
 ```json
 { "id": "uuid", "revoked_at": "2026-02-28T08:00:00.000Z" }
@@ -347,11 +383,11 @@ Optional fields:
 Rules:
 - `category` must match `^[a-z0-9_-]{2,50}$` (lowercase).
 - `event_properties` is a free-form JSON object capped by `EVENT_PROPERTIES_MAX_BYTES` (default 8 KB).
-- `game_type` defaults to `other` when omitted.
+- `game_type` is optional metadata. It may be omitted entirely.
 
 ## Scoring Rules
 Scores are computed during ingest and written to Redis + the stream.
-- Per-game scoring rules (from `core.scoring_rules`) are applied first.
+- Per-game scoring rules (from `public.scoring_rules`) are applied first.
 - If no rule is found, `event_properties.score` is used when present; otherwise `0`.
 - Rule order: `event_id` → `category` → `default`.
 - JWT verification is local when `SUPABASE_JWT_SECRET` is set; otherwise it falls back to `SUPABASE_URL` + `SUPABASE_ANON_KEY`.
@@ -380,19 +416,19 @@ The Supabase schema is stored at `db/schema.sql`.
 - `env` is `dev` or `prod` on all event and aggregate rows.
 
 **Core Tables**
-- `core.tenants` (owned by `owner_user_id`)
-- `core.games`
-- `core.api_keys` (hashed + encrypted)
-- `core.scoring_rules` (versioned)
+- `public.tenants` (owned by `owner_user_id`)
+- `public.games`
+- `public.api_keys` (hashed)
+- `public.scoring_rules` (versioned)
 
 **Ingest**
-- `ingest.events` (append-only). Use `dedup_id` + unique constraint to make writes idempotent.
+- `public.events` (append-only). Use `dedup_id` + unique constraint to make writes idempotent.
 
 **Analytics**
-- `analytics.metric_definitions`
-- `analytics.user_metrics`
-- `analytics.leaderboard_daily`
-- `analytics.leaderboard_all`
+- `public.metric_definitions`
+- `public.user_metrics`
+- `public.leaderboard_daily`
+- `public.leaderboard_all`
 
 ## Worker
 The worker consumes the Redis events stream and writes data to Supabase.
@@ -406,8 +442,8 @@ The worker consumes the Redis events stream and writes data to Supabase.
 - Max length: `REDIS_STREAM_MAXLEN` (default `200000`)
 
 **Responsibilities**
-- Insert raw events into `ingest.events` (idempotent via `dedup_id`).
-- Increment `analytics.leaderboard_all` and `analytics.leaderboard_daily`.
+- Insert raw events into `public.events` (idempotent via `dedup_id`).
+- Increment `public.leaderboard_all` and `public.leaderboard_daily`.
 
 **Run**
 - `npm run worker`
@@ -431,7 +467,6 @@ The worker consumes the Redis events stream and writes data to Supabase.
 | `SUPABASE_URL` | Optional | Supabase project URL (fallback auth) | `https://xyz.supabase.co` |
 | `SUPABASE_ANON_KEY` | Optional | Supabase anon key (fallback auth) | `eyJ...` |
 | `API_KEYS_JSON` | Optional | Static API keys (dev/bootstrap) | `[{"key":"...","tenantId":"...","gameId":"...","gameSlug":"valorant","env":"prod"}]` |
-| `API_KEY_ENCRYPTION_SECRET` | Yes (dashboard keys) | Encrypt API keys at rest | `super-secret` |
 | `API_KEY_CACHE_TTL_MS` | No | API key lookup cache | `60000` |
 | `RATE_LIMIT_MAX` | No | Rate limit max | `200` |
 | `RATE_LIMIT_TIME_WINDOW_MS` | No | Rate window ms | `1000` |
@@ -517,13 +552,13 @@ Create a daily cron job that deletes old raw events.
 
 **SQL**
 ```sql
-DELETE FROM ingest.events
+DELETE FROM public.events
 WHERE client_ts < now() - interval '3 months';
 ```
 
 **Cron example**
 ```
-0 3 * * * psql "$SUPABASE_DB_URL" -c "DELETE FROM ingest.events WHERE client_ts < now() - interval '3 months';"
+0 3 * * * psql "$SUPABASE_DB_URL" -c "DELETE FROM public.events WHERE client_ts < now() - interval '3 months';"
 ```
 
 ## API Examples
@@ -606,8 +641,18 @@ curl -X POST http://localhost:3000/v1/dashboard/games/valorant/api-keys \
   -d '{"env":"prod","scopes":["ingest","read"]}'
 ```
 
-**Fetch an API key (explicit request)**
+**Update game metadata with a Supabase Storage image URL**
 ```bash
-curl -H "Authorization: Bearer <SUPABASE_JWT>" \
-  http://localhost:3000/v1/dashboard/games/valorant/api-keys/<KEY_ID>
+curl -X PUT http://localhost:3000/v1/dashboard/games/valorant \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <SUPABASE_JWT>" \
+  -d '{"cover_image_url":"https://your-project.supabase.co/storage/v1/object/public/games/valorant.png"}'
+```
+
+**Publish a game to prod**
+```bash
+curl -X PUT http://localhost:3000/v1/dashboard/games/valorant/publish \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <SUPABASE_JWT>" \
+  -d '{"env":"prod"}'
 ```

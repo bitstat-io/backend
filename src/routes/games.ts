@@ -18,7 +18,12 @@ export async function gamesRoutes(app: FastifyInstance) {
       },
     },
     async () => {
-      const games = (await listPublicGames('prod')).map((slug) => ({ game_slug: slug }));
+      const games = (await listPublicGames('prod')).map((game) => ({
+        game_slug: game.gameSlug,
+        name: game.name,
+        game_type: game.gameType,
+        cover_image_url: game.coverImageUrl,
+      }));
       return { games };
     },
   );

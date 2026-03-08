@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 
-import { redis } from '../redis/client';
+import { healthResponseSchema, readinessResponseSchema } from '../schemas/health';
+import { getHealthStatus, getReadinessStatus } from '../services/health/status';
 
 export async function healthRoutes(app: FastifyInstance) {
   app.get(
@@ -8,23 +9,37 @@ export async function healthRoutes(app: FastifyInstance) {
     {
       schema: {
         summary: 'Health check',
-        description: 'Returns API health and Redis connectivity.',
+        description: 'Liveness check for the API and Redis connectivity.',
         tags: ['Health'],
+        response: {
+          200: healthResponseSchema,
+        },
       },
     },
     async () => {
-      let redisOk = false;
-      try {
-        const pong = await redis.ping();
-        redisOk = pong === 'PONG';
-      } catch {
-        redisOk = false;
-      }
+      return getHealthStatus();
+    },
+  );
 
-      return {
-        status: 'ok',
-        redis: redisOk,
-      };
+  app.get(
+    '/health/ready',
+    {
+      schema: {
+        summary: 'Readiness check',
+        description: 'Readiness check for Redis, Postgres, and the events worker consumer group.',
+        tags: ['Health'],
+        response: {
+          200: readinessResponseSchema,
+          503: readinessResponseSchema,
+        },
+      },
+    },
+    async (_request, reply) => {
+      const status = await getReadinessStatus();
+      if (status.status !== 'ok') {
+        reply.code(503);
+      }
+      return status;
     },
   );
 }
