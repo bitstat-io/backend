@@ -108,7 +108,7 @@ Note: public registry lookups still require Redis to be reachable. The current P
 - Scoring rules endpoints accept either an API key (admin/read) or a Supabase JWT (owner).
 **Supabase JWT auth**
 - Use `Authorization: Bearer <access_token>` from Supabase Auth.
-- Set `SUPABASE_JWT_SECRET` (preferred) or `SUPABASE_URL` + `SUPABASE_ANON_KEY` for verification.
+- Set `SUPABASE_JWT_SECRET` (preferred) or `SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY` for verification.
 
 ### Supabase JWT (Owner) Only
 - `GET /v1/dashboard/games`
@@ -390,7 +390,7 @@ Scores are computed during ingest and written to Redis + the stream.
 - Per-game scoring rules (from `public.scoring_rules`) are applied first.
 - If no rule is found, `event_properties.score` is used when present; otherwise `0`.
 - Rule order: `event_id` → `category` → `default`.
-- JWT verification is local when `SUPABASE_JWT_SECRET` is set; otherwise it falls back to `SUPABASE_URL` + `SUPABASE_ANON_KEY`.
+- JWT verification is local when `SUPABASE_JWT_SECRET` is set; otherwise it falls back to `SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY`.
 
 **Example rule JSON**
 ```json
@@ -465,7 +465,7 @@ The worker consumes the Redis events stream and writes data to Supabase.
 | `SUPABASE_DB_URL` | Yes (worker, scoring rules, key mgmt) | Postgres connection | `postgresql://user:pass@host:5432/postgres` |
 | `SUPABASE_JWT_SECRET` | Optional | Verify Supabase JWT locally | `super-secret` |
 | `SUPABASE_URL` | Optional | Supabase project URL (fallback auth) | `https://xyz.supabase.co` |
-| `SUPABASE_ANON_KEY` | Optional | Supabase anon key (fallback auth) | `eyJ...` |
+| `SUPABASE_PUBLISHABLE_KEY` | Optional | Supabase publishable key (fallback auth) | `sb_publishable_...` |
 | `API_KEYS_JSON` | Optional | Static API keys (dev/bootstrap) | `[{"key":"...","tenantId":"...","gameId":"...","gameSlug":"valorant","env":"prod"}]` |
 | `API_KEY_CACHE_TTL_MS` | No | API key lookup cache | `60000` |
 | `RATE_LIMIT_MAX` | No | Rate limit max | `200` |

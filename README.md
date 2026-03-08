@@ -63,7 +63,7 @@ BitStat is a Redis-backed ingestion API with public leaderboards. API keys scope
 - `DELETE /v1/dashboard/games/:gameSlug/api-keys/:keyId`
 
 Use `Authorization: Bearer <access_token>` from Supabase Auth.
-Set `SUPABASE_JWT_SECRET` (preferred) or `SUPABASE_URL` + `SUPABASE_ANON_KEY`.
+Set `SUPABASE_JWT_SECRET` (preferred) or `SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY`.
 
 **Publishing**
 - Owners upload artwork to Supabase Storage and store the resulting public image URL in `cover_image_url`.
@@ -90,6 +90,7 @@ Set `SUPABASE_JWT_SECRET` (preferred) or `SUPABASE_URL` + `SUPABASE_ANON_KEY`.
 
 **More Docs**
 - See `docs/README.md` for the full architecture, API, and ops guide.
+- See `docs/deploy-vps.md` for a single-VPS deployment guide using Redis, PM2, and Nginx.
 
 **Bootstrap**
 - Run `db/schema.sql` on a fresh database to create the schema.

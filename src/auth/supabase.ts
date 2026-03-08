@@ -24,12 +24,12 @@ export async function verifySupabaseJwt(token: string): Promise<SupabaseUser | n
     }
   }
 
-  if (env.SUPABASE_URL && env.SUPABASE_ANON_KEY) {
+  if (env.SUPABASE_URL && env.SUPABASE_PUBLISHABLE_KEY) {
     try {
       const res = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
         headers: {
           Authorization: `Bearer ${token}`,
-          apikey: env.SUPABASE_ANON_KEY,
+          apikey: env.SUPABASE_PUBLISHABLE_KEY,
         },
       });
       if (!res.ok) return null;
