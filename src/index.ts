@@ -38,9 +38,12 @@ export async function buildServer() {
           'Quick start:\n' +
           '1. Ingest events with `POST /v1/events/batch` using your API key.\n' +
           '2. Fetch public leaderboards with `GET /v1/games/{gameSlug}/leaderboards` (prod)\n' +
-          '   or `GET /v1/games/dev/{gameSlug}/leaderboards` (dev).\n\n' +
+          '   or `GET /v1/games/dev/{gameSlug}/leaderboards` (dev).\n' +
+          '3. Use owner JWT routes under `GET /v1/dashboard/games/{gameSlug}/...`\n' +
+          '   for dashboard stats, overview, and live stream data.\n\n' +
           'Authentication:\n' +
-          '- Provide `X-API-Key: <key>` (or `Authorization: Bearer <key>`) for protected endpoints.',
+          '- Provide `X-API-Key: <key>` (or `Authorization: Bearer <key>`) for protected endpoints.\n' +
+          '- Provide `Authorization: Bearer <Supabase access token>` for owner dashboard endpoints.',
       },
       tags: [
         { name: 'Ingest', description: 'Event ingestion endpoints' },
@@ -172,6 +175,18 @@ export async function buildServer() {
       });
 
       setResponseExample('/v1/games/{gameSlug}/stats', 'get', '200', {
+        gameSlug: 'tetris',
+        user_id: 'player_123',
+        stats: {
+          events: '42',
+          kills: '12',
+          deaths: '4',
+          assists: '9',
+          matches: '3',
+        },
+      });
+
+      setResponseExample('/v1/dashboard/games/{gameSlug}/stats', 'get', '200', {
         gameSlug: 'tetris',
         user_id: 'player_123',
         stats: {

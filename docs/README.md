@@ -46,6 +46,7 @@ This diagram is the fastest way to understand the MVP architecture end to end: w
 - Public leaderboard reads prefer Redis for speed and fall back to Postgres leaderboard aggregates when leaderboard cache data is missing.
 - Public game discovery uses a Redis-backed registry keyed by publish state, with Postgres used to rebuild missing registry entries.
 - Owner flows are explicit backend actions: create game, update metadata, create API key, publish, and unpublish.
+- Owner dashboards can also resolve an owned game into the same internal `{tenantId, gameId, env}` scope used by API-key routes, so live stats and overview data can be accessed without exposing admin keys in the frontend.
 - Scoring is applied during ingest using per-game rules from `public.core_scoring_rules` when available, with a simple event-property fallback for MVP usage.
 - Stats are generic and event-driven. The backend increments common counters like `matches` and `sessions`, and aggregates numeric properties such as `kills`, `coins`, and `iap_amount`.
 
@@ -85,6 +86,7 @@ Note: public registry lookups still require Redis to be reachable. The current P
 
 ### Frontend-Safe API (No Auth)
 - `GET /v1/health`
+- `GET /v1/health/ready`
 - `GET /v1/games` (prod only)
 - `GET /v1/games/{gameSlug}/leaderboards` (prod)
 - `GET /v1/games/dev/{gameSlug}/leaderboards` (dev)
@@ -93,7 +95,7 @@ Note: public registry lookups still require Redis to be reachable. The current P
 - `window`: `all`, `1d`, `7d`, `30d`
 - `limit`: max entries to return
 
-### Requires API Key (or Supabase JWT for scoring routes)
+### Requires API Key
 - `POST /v1/events/batch`
 - `GET /v1/games/:gameSlug/stats`
 - `GET /v1/games/:gameSlug/scoring-rules`
@@ -102,7 +104,8 @@ Note: public registry lookups still require Redis to be reachable. The current P
 - `GET /v1/games/:gameSlug/scoring-rules/versions`
 - `PUT /v1/games/:gameSlug/scoring-rules/versions/:version/activate` (admin scope)
 - `DELETE /v1/games/:gameSlug/scoring-rules` (admin scope)
-- `GET /v1/dashboard/*`
+- `GET /v1/dashboard/overview`
+- `GET /v1/dashboard/stream`
 
 **Scoring rules auth**
 - Scoring rules endpoints accept either an API key (admin/read) or a Supabase JWT (owner).
@@ -119,6 +122,9 @@ Note: public registry lookups still require Redis to be reachable. The current P
 - `GET /v1/dashboard/games/:gameSlug/api-keys`
 - `POST /v1/dashboard/games/:gameSlug/api-keys`
 - `DELETE /v1/dashboard/games/:gameSlug/api-keys/:keyId`
+- `GET /v1/dashboard/games/:gameSlug/stats`
+- `GET /v1/dashboard/games/:gameSlug/overview`
+- `GET /v1/dashboard/games/:gameSlug/stream`
 
 ## API Data Formats
 
@@ -139,6 +145,27 @@ Note: public registry lookups still require Redis to be reachable. The current P
     "redis": {
       "status": "ok",
       "latency_ms": 1
+    }
+  }
+}
+```
+
+### `GET /v1/health/ready`
+```json
+{
+  "status": "ok",
+  "checks": {
+    "redis": {
+      "status": "ok",
+      "latency_ms": 1
+    },
+    "postgres": {
+      "status": "ok",
+      "latency_ms": 3
+    },
+    "worker": {
+      "status": "ok",
+      "lag": 0
     }
   }
 }
@@ -222,6 +249,18 @@ Query: `user_id=<player id>`
   "stats": { "events": "12", "kills": "5" }
 }
 ```
+Requires API key with `read` or `admin` scope that matches the requested game slug.
+
+### `GET /v1/dashboard/games/:gameSlug/stats`
+Query: `user_id=<player id>&env=dev|prod` (`env` defaults to `prod`)
+```json
+{
+  "gameSlug": "valorant",
+  "user_id": "player_1",
+  "stats": { "events": "12", "kills": "5" }
+}
+```
+This is the owner-safe equivalent of `GET /v1/games/:gameSlug/stats` and accepts a Supabase JWT instead of an API key.
 
 ### `GET /v1/games/:gameSlug/scoring-rules`
 ```json
@@ -336,10 +375,22 @@ Query: `range=5m|1h|24h|7d`
   "topPlayers": [{ "user_id": "player_1", "score": 120 }]
 }
 ```
+This route is API-key scoped and is intended for operational access with a matching `read` or `admin` key.
 
 ### `GET /v1/dashboard/stream`
 Query: `range=5m|1h|24h|7d`
 SSE payload (each `data:` line) uses the same JSON shape as `GET /v1/dashboard/overview`.
+This route is API-key scoped and is intended for operational access with a matching `read` or `admin` key.
+
+### `GET /v1/dashboard/games/:gameSlug/overview`
+Query: `range=5m|1h|24h|7d&env=dev|prod` (`range` defaults to `5m`, `env` defaults to `prod`)
+Response: same JSON shape as `GET /v1/dashboard/overview`.
+This is the owner-safe equivalent of the overview route and accepts a Supabase JWT.
+
+### `GET /v1/dashboard/games/:gameSlug/stream`
+Query: `range=5m|1h|24h|7d&env=dev|prod` (`range` defaults to `5m`, `env` defaults to `prod`)
+SSE payload (each `data:` line) uses the same JSON shape as `GET /v1/dashboard/overview`.
+This is the owner-safe equivalent of the stream route and accepts a Supabase JWT.
 
 ### `GET /v1/dashboard/games`
 ```json
@@ -605,6 +656,11 @@ WHERE client_ts < now() - interval '3 months';
 curl http://localhost:3000/v1/health
 ```
 
+**Readiness**
+```bash
+curl http://localhost:3000/v1/health/ready
+```
+
 **List prod games**
 ```bash
 curl http://localhost:3000/v1/games
@@ -692,6 +748,24 @@ curl -X POST http://localhost:3000/v1/dashboard/games/valorant/api-keys \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <SUPABASE_JWT>" \
   -d '{"env":"prod","scopes":["ingest","read"]}'
+```
+
+**Owner player stats (Supabase JWT)**
+```bash
+curl -H "Authorization: Bearer <SUPABASE_JWT>" \
+  "http://localhost:3000/v1/dashboard/games/valorant/stats?user_id=player_1&env=prod"
+```
+
+**Owner overview (Supabase JWT)**
+```bash
+curl -H "Authorization: Bearer <SUPABASE_JWT>" \
+  "http://localhost:3000/v1/dashboard/games/valorant/overview?range=1h&env=prod"
+```
+
+**Owner live stream (Supabase JWT)**
+```bash
+curl -N -H "Authorization: Bearer <SUPABASE_JWT>" \
+  "http://localhost:3000/v1/dashboard/games/valorant/stream?range=5m&env=prod"
 ```
 
 **Update game metadata with a Supabase Storage image URL**

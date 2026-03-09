@@ -2,8 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
 import type { ApiScope } from '../auth/types';
-import { extractBearerToken } from '../auth/bearer';
-import { verifySupabaseJwt } from '../auth/supabase';
+import { requireSupabaseOwner } from '../auth/owner';
 import { getDb } from '../db/client';
 import {
   apiKeyResponseSchema,
@@ -19,8 +18,6 @@ import {
 import { createApiKey, listApiKeys, revokeApiKey } from '../services/api-keys/store';
 import { syncPublicGameCache } from '../services/games/registry';
 import { findOwnedGameBySlug } from '../services/games/ownership';
-
-type SupabaseUser = { id: string; email?: string };
 
 function mapGame(row: Record<string, unknown>) {
   return {
@@ -38,21 +35,7 @@ function mapGame(row: Record<string, unknown>) {
 }
 
 async function requireSupabaseUser(request: FastifyRequest, reply: FastifyReply) {
-  const token = extractBearerToken(request.headers.authorization);
-  if (!token) {
-    reply.code(401);
-    return reply.send({ error: { code: 'UNAUTHORIZED', message: 'Missing Supabase JWT.' } });
-  }
-  const user = await verifySupabaseJwt(token);
-  if (!user) {
-    reply.code(401);
-    return reply.send({ error: { code: 'UNAUTHORIZED', message: 'Invalid Supabase JWT.' } });
-  }
-  if (!user.email) {
-    reply.code(400);
-    return reply.send({ error: { code: 'BAD_REQUEST', message: 'Owner email is required in the auth token.' } });
-  }
-  return user as SupabaseUser;
+  return requireSupabaseOwner(request, reply);
 }
 
 export async function ownerRoutes(app: FastifyInstance) {
