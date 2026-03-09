@@ -74,8 +74,8 @@ export async function getDashboardOverview(range: Range, scope: GameScope) {
   const totalObserved = totals.accepted + totals.rejected + totals.errors;
   const errorRate = totalObserved > 0 ? totals.errors / totalObserved : 0;
   const rejectRate = totalObserved > 0 ? totals.rejected / totalObserved : 0;
-  const latestEvents = traffic[traffic.length - 1]?.events ?? 0;
-  const eventsPerSec = latestEvents / config.unitSeconds;
+  const totalWindowSeconds = Math.max(traffic.length * config.unitSeconds, 1);
+  const eventsPerSec = totals.events / totalWindowSeconds;
 
   const uniquePlayers = await getUniquePlayers(scope, range);
   const topGames = await getTopGames(scope, range, 5);
