@@ -28,13 +28,17 @@ export async function scoringRoutes(app: FastifyInstance) {
     const token = extractBearerToken(request.headers.authorization);
     if (token) {
       const user = await verifySupabaseJwt(token);
-      if (user) {
-        const owned = await findOwnedGameBySlug(gameSlug, user.id);
+      if (user?.email) {
+        const owned = await findOwnedGameBySlug(gameSlug, user.email);
         if (!owned) {
           reply.code(404);
           return reply.send({ error: { code: 'NOT_FOUND', message: 'Game not found.' } });
         }
         return { gameId: owned.gameId, gameSlug: owned.gameSlug };
+      }
+      if (user) {
+        reply.code(400);
+        return reply.send({ error: { code: 'BAD_REQUEST', message: 'Owner email is required in the auth token.' } });
       }
     }
 

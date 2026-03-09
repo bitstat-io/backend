@@ -133,19 +133,41 @@ Note: public registry lookups still require Redis to be reachable. The current P
 
 ### `GET /v1/health`
 ```json
-{ "status": "ok", "redis": true }
+{
+  "status": "ok",
+  "checks": {
+    "redis": {
+      "status": "ok",
+      "latency_ms": 1
+    }
+  }
+}
 ```
 
 ### `GET /v1/games`
 ```json
-{ "games": [{ "game_slug": "valorant" }] }
+{
+  "games": [
+    {
+      "game_slug": "valorant",
+      "name": "Valorant",
+      "game_type": "fps",
+      "cover_image_url": "https://your-project.supabase.co/storage/v1/object/public/games/valorant.png"
+    }
+  ]
+}
 ```
 
 ### `GET /v1/games/:gameSlug/leaderboards`
 Query: `window=all|1d|7d|30d`, `limit=1..100`
 ```json
 {
-  "gameSlug": "valorant",
+  "game": {
+    "slug": "valorant",
+    "name": "Valorant",
+    "game_type": "fps",
+    "cover_image_url": "https://your-project.supabase.co/storage/v1/object/public/games/valorant.png"
+  },
   "window": "1d",
   "entries": [{ "rank": 1, "user_id": "player_1", "score": 120 }]
 }
@@ -155,7 +177,12 @@ Query: `window=all|1d|7d|30d`, `limit=1..100`
 Query: `window=all|1d|7d|30d`, `limit=1..100`
 ```json
 {
-  "gameSlug": "valorant",
+  "game": {
+    "slug": "valorant",
+    "name": "Valorant",
+    "game_type": "fps",
+    "cover_image_url": "https://your-project.supabase.co/storage/v1/object/public/games/valorant.png"
+  },
   "window": "1d",
   "entries": [{ "rank": 1, "user_id": "player_1", "score": 120 }]
 }
@@ -261,8 +288,9 @@ Query: `range=5m|1h|24h|7d`
     "uniquePlayers": 45,
     "errorRate": 0,
     "rejectRate": 0.016,
-    "fpsEvents": 80,
-    "mobileEvents": 38,
+    "matches": 40,
+    "sessions": 38,
+    "purchases": 12,
     "iap": 12.5,
     "eventsPerSec": 0.4
   },
@@ -298,8 +326,9 @@ Query: `range=5m|1h|24h|7d`
       "accepted": 2,
       "rejected": 0,
       "errors": 0,
-      "fps": 2,
-      "mobile": 0,
+      "matches": 1,
+      "sessions": 1,
+      "purchases": 0,
       "iap": 0
     }
   ],
@@ -321,6 +350,11 @@ SSE payload (each `data:` line) uses the same JSON shape as `GET /v1/dashboard/o
       "slug": "valorant",
       "name": "Valorant",
       "game_type": "fps",
+      "cover_image_url": "https://your-project.supabase.co/storage/v1/object/public/games/valorant.png",
+      "is_published_prod": true,
+      "is_published_dev": false,
+      "published_prod_at": "2026-02-28T08:00:00.000Z",
+      "published_dev_at": null,
       "created_at": "2026-02-28T08:00:00.000Z"
     }
   ]
@@ -634,6 +668,22 @@ curl -X POST http://localhost:3000/v1/dashboard/games \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <SUPABASE_JWT>" \
   -d '{"slug":"valorant","name":"Valorant","game_type":"fps"}'
+```
+
+**Create a game response**
+```json
+{
+  "id": "uuid",
+  "slug": "valorant",
+  "name": "Valorant",
+  "game_type": "fps",
+  "cover_image_url": null,
+  "is_published_prod": false,
+  "is_published_dev": false,
+  "published_prod_at": null,
+  "published_dev_at": null,
+  "created_at": "2026-02-28T08:00:00.000Z"
+}
 ```
 
 **Create an API key (Supabase JWT)**
